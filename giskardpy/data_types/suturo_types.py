@@ -12,9 +12,9 @@ class GripperTypes(Enum):
 # List of Methods that need Thresholds for force_monitor: GraspObjectCarefully(might include Doors?), Placing
 @unique
 class ForceTorqueThresholds(Enum):
-    FT_Grasp = 'Grasp'
+    GRASP = 'Grasp'
     FT_PlaceCutlery = 'PlaceCutlery'
-    FT_Placing = 'Place'
+    PLACE = 'Place'
     FT_Door = 'Door'
     FT_DishDoor = 'DishDoor'
     FT_Tilt = 'Tilt'  # Pouring

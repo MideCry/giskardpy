@@ -96,7 +96,7 @@ class PayloadForceTorque(PayloadMonitor):
         if self.state:
             return
 
-        if self.threshold_name == ForceTorqueThresholds.FT_Grasp.value:
+        if self.threshold_name == ForceTorqueThresholds.GRASP.value:
             print(rob_force)
             print(self.state)
 
@@ -154,7 +154,7 @@ class PayloadForceTorque(PayloadMonitor):
                 raise Exception("No valid object_type found, unable to determine placing thresholds!")
 
         # TODO: Add thresholds and cases for other object types
-        elif self.threshold_name == ForceTorqueThresholds.FT_Placing.value:
+        elif self.threshold_name == ForceTorqueThresholds.PLACE.value:
 
             # case for placing "normal" objects (namely Milk, Cereal and cups)
             if self.object_type == ObjectTypes.OT_Default.value:
