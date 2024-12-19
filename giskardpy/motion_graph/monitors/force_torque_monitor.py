@@ -157,7 +157,7 @@ class PayloadForceTorque(PayloadMonitor):
         elif self.threshold_name == ForceTorqueThresholds.FT_Placing.value:
 
             # case for placing "normal" objects (namely Milk, Cereal and cups)
-            if self.object_type == ObjectTypes.OT_Standard.value:
+            if self.object_type == ObjectTypes.OT_Default.value:
 
                 force_z_threshold = 35
 
