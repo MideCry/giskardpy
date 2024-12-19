@@ -169,5 +169,5 @@ class BehaviorTreeException(GiskardException):
 
 
 # %% ForceTorque exceptions
-class ForceTorqueThresholdException(GiskardException):
+class ObjectForceTorqueThresholdException(GiskardException):
     pass

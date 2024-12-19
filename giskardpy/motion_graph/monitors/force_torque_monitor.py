@@ -96,12 +96,12 @@ class PayloadForceTorque(PayloadMonitor):
         if self.state:
             return
 
-        if self.threshold_name == ForceTorqueThresholds.FT_GraspWithCare.value:
+        if self.threshold_name == ForceTorqueThresholds.FT_Grasp.value:
             print(rob_force)
             print(self.state)
 
             # case for grasping "normal" objects (namely Milk, Cereal and cups)
-            if self.object_type == ObjectTypes.OT_Standard.value:
+            if self.object_type == ObjectTypes.OT_Default.value:
 
                 torque_threshold = 2
 

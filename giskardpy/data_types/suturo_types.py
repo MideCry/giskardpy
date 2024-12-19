@@ -12,7 +12,7 @@ class GripperTypes(Enum):
 # List of Methods that need Thresholds for force_monitor: GraspObjectCarefully(might include Doors?), Placing
 @unique
 class ForceTorqueThresholds(Enum):
-    FT_GraspWithCare = 'GraspCarefully'
+    FT_Grasp = 'Grasp'
     FT_PlaceCutlery = 'PlaceCutlery'
     FT_Placing = 'Place'
     FT_Door = 'Door'
@@ -24,7 +24,7 @@ class ForceTorqueThresholds(Enum):
 # List of Objects that need to be differentiated between when placing method is used
 @unique
 class ObjectTypes(Enum):
-    OT_Standard = 'Standard'  # Normal Objects(e.g Milk), includes Cups/Glasses, since planning grabs them from front
+    OT_Default = 'Default'  # Normal Objects(e.g Milk), includes Cups/Glasses, since planning grabs them from front
     OT_Cutlery = 'Cutlery'
     OT_Plate = 'Plate'
     OT_Bowl = 'Bowl'
