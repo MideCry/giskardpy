@@ -16,10 +16,9 @@ class ForceTorqueThresholds(Enum):
     GRASP = 'Grasp'
     FT_PlaceCutlery = 'PlaceCutlery'
     PLACE = 'Place'
-    FT_Door = 'Door'
-    FT_DishDoor = 'DishDoor'
+    DOOR = 'Door'
+    DISHDOOR = 'DishDoor'
     FT_Tilt = 'Tilt'  # Pouring
-    # FT_Shelf_Grasp = 'FT_Shelf' # Might not be needed at all
 
 
 # List of Objects that need to be differentiated between when placing method is used
