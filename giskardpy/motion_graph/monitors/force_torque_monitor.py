@@ -66,7 +66,6 @@ class PayloadForceTorque(PayloadMonitor):
         since conversion into the map frame can lead to different values depending on how the map is recorded.
 
         :param wrench: the wrench of the WrenchStamped, used to get header and force-torque data
-        :param picker: value which is used to determine whether we want to get the force or the torque
         """
         wrench.header.frame_id = self.sensor_frame
 

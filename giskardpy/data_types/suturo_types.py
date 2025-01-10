@@ -13,11 +13,10 @@ class GripperTypes(Enum):
 # TODO: Rework Enum Names
 @unique
 class ForceTorqueThresholds(Enum):
-    GRASP = 'Grasp'
-    FT_PlaceCutlery = 'PlaceCutlery'
-    PLACE = 'Place'
-    DOOR = 'Door'
-    DISHDOOR = 'DishDoor'
+    GRASP = 1
+    PLACE = 2
+    DOOR = 3
+    DISHDOOR = 4
     FT_Tilt = 'Tilt'  # Pouring
 
 
