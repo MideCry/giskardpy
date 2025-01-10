@@ -21,7 +21,7 @@ from giskardpy.data_types.suturo_types import ForceTorqueThresholds, ObjectTypes
 class PayloadForceTorque(PayloadMonitor):
     def __init__(self,
                  # threshold_name is needed here for the class to be able to handle the suturo_types appropriately
-                 threshold_name: str,
+                 threshold_enum: int,
                  topic: str,
                  # object_type is needed to differentiate between objects with different thresholds
                  object_type: str,
@@ -35,7 +35,7 @@ class PayloadForceTorque(PayloadMonitor):
         This makes it possible for goals which use the Force-Torque Sensor to be used with Monitors,
         specifically to end/hold a goal automatically when a certain Force/Torque Threshold is being surpassed.
 
-        :param threshold_name: contains the name of the threshold that will be used (normally an action e.g. Placing)
+        :param threshold_enum: contains the name of the threshold that will be used (normally an action e.g. Placing)
         :param object_type: is used to determine the type of object that is being placed, is left empty if no object is being placed
         :param topic: the name of the topic
         :param name: name of the monitor class
@@ -46,14 +46,14 @@ class PayloadForceTorque(PayloadMonitor):
 
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.object_type = object_type
-        self.threshold_name = threshold_name
+        self.threshold_enum = threshold_enum
         self.topic = topic
         self.wrench = WrenchStamped()
         self.bf = god_map.world.search_for_link_name('base_footprint')
         self.sensor_frame = god_map.world.search_for_link_name(wait_for_message(topic, WrenchStamped).header.frame_id)
         self.subscriber = rospy.Subscriber(name=topic,
                                            data_class=WrenchStamped, callback=self.cb)
-        self.strategy = ThresholdStrategyFactory.get_strategy(self.object_type, self.threshold_name)
+        self.strategy = ThresholdStrategyFactory.get_strategy(self.object_type, self.threshold_enum)
 
     def cb(self, data: WrenchStamped):
         self.rob_force, self.rob_torque = self.force_T_base_transform(data)
@@ -345,11 +345,11 @@ class PlaceThresholdStrategy(ThresholdStrategy):
 
 class ThresholdStrategyFactory:
     @staticmethod
-    def get_strategy(object_type, threshold_name):
-        if threshold_name == ForceTorqueThresholds.GRASP.value:
+    def get_strategy(object_type, threshold_enum):
+        if threshold_enum == ForceTorqueThresholds.GRASP.value:
             return GraspThresholdStrategy(object_type)
 
-        elif threshold_name == ForceTorqueThresholds.PLACE.value:
+        elif threshold_enum == ForceTorqueThresholds.PLACE.value:
             return PlaceThresholdStrategy(object_type)
         else:
-            raise ValueError(f"Invalid threshold name: {threshold_name}")
+            raise ValueError(f"Invalid threshold name: {threshold_enum}")
