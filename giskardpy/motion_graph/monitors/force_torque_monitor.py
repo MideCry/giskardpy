@@ -343,6 +343,19 @@ class PlaceThresholdStrategy(ThresholdStrategy):
             raise Exception("No valid object_type found, unable to determine placing thresholds!")
 
 
+class DoorThresholdStrategy(ThresholdStrategy):
+
+    def check_thresholds(self, rob_force, rob_torque):
+        force_x_threshold = 35
+
+        if abs(rob_force[0]) >= force_x_threshold:
+            get_middleware().loginfo(
+                f'HIT DOOR!: X:{rob_force[0]}')
+            return True
+        else:
+            return False
+
+
 class ThresholdStrategyFactory:
     @staticmethod
     def get_strategy(object_type, threshold_enum):
@@ -351,5 +364,7 @@ class ThresholdStrategyFactory:
 
         elif threshold_enum == ForceTorqueThresholds.PLACE.value:
             return PlaceThresholdStrategy(object_type)
+        elif threshold_enum == ForceTorqueThresholds.DOOR.value:
+            return DoorThresholdStrategy()
         else:
             raise ValueError(f"Invalid threshold name: {threshold_enum}")
