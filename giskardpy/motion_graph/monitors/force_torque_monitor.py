@@ -20,10 +20,11 @@ from giskardpy.data_types.suturo_types import ForceTorqueThresholds, ObjectTypes
 
 class PayloadForceTorque(PayloadMonitor):
     def __init__(self,
-                 # threshold_name is needed here for the class to be able to handle the suturo_types appropriately
+                 # threshold_enum is needed here for the class to be able to handle the suturo_types appropriately
                  threshold_enum: int,
                  topic: str,
                  # object_type is needed to differentiate between objects with different thresholds
+                 # (not needed for door, just pass an empty string)
                  object_type: str,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
@@ -35,7 +36,7 @@ class PayloadForceTorque(PayloadMonitor):
         This makes it possible for goals which use the Force-Torque Sensor to be used with Monitors,
         specifically to end/hold a goal automatically when a certain Force/Torque Threshold is being surpassed.
 
-        :param threshold_enum: contains the name of the threshold that will be used (normally an action e.g. Placing)
+        :param threshold_enum: contains the enum of the threshold that will be used (normally an action e.g. PLACE)
         :param object_type: is used to determine the type of object that is being placed, is left empty if no object is being placed
         :param topic: the name of the topic
         :param name: name of the monitor class
@@ -87,7 +88,7 @@ class PayloadForceTorque(PayloadMonitor):
         rob_force = copy(self.rob_force)
         rob_torque = copy(self.rob_torque)
         # if self.state is necessary here because otherwise the monitor will return false
-        # in next iteration after already having returned True
+        # in next iteration after already having returned True thus always cancelling the current goal
         if self.state:
             return
 
@@ -357,6 +358,12 @@ class DoorThresholdStrategy(ThresholdStrategy):
 
 
 class ThresholdStrategyFactory:
+    """
+    The ThresholdStrategyFactory takes the given threshold and object type
+    and calls the appropriate ThresholdStrategy, which in turn possesses the
+    logic for the different object types.
+    """
+
     @staticmethod
     def get_strategy(object_type, threshold_enum):
         if threshold_enum == ForceTorqueThresholds.GRASP.value:
@@ -364,6 +371,7 @@ class ThresholdStrategyFactory:
 
         elif threshold_enum == ForceTorqueThresholds.PLACE.value:
             return PlaceThresholdStrategy(object_type)
+
         elif threshold_enum == ForceTorqueThresholds.DOOR.value:
             return DoorThresholdStrategy()
         else:
