@@ -347,11 +347,11 @@ class PlaceThresholdStrategy(ThresholdStrategy):
 class DoorThresholdStrategy(ThresholdStrategy):
 
     def check_thresholds(self, rob_force, rob_torque):
-        force_x_threshold = 35
+        force_z_threshold = 70
 
-        if abs(rob_force[0]) >= force_x_threshold:
+        if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(
-                f'HIT DOOR!: X:{rob_force[0]}')
+                f'HIT DOOR!: X:{rob_force[2]}')
             return True
         else:
             return False
