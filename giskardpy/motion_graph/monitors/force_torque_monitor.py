@@ -258,7 +258,7 @@ class GraspThresholdStrategy(ThresholdStrategy):
 
             if (abs(rob_force[1]) > torque_threshold or
                     abs(rob_force[1]) > torque_threshold):
-                print(f'HIT GWC: {rob_force[0]};{rob_torque[1]}')
+                get_middleware().loginfo(f'HIT GWC: {rob_force[0]};{rob_torque[1]}')
                 return False
             else:
                 return True
@@ -269,8 +269,7 @@ class GraspThresholdStrategy(ThresholdStrategy):
             force_threshold = 50.0
 
             if abs(rob_force[2]) > force_threshold:
-                print(rob_force[2])
-                get_middleware().loginfo(rob_force[2])
+                get_middleware().loginfo(f'HIT GWC: {rob_force[2]}')
                 return True
             else:
                 return False
