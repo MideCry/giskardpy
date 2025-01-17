@@ -4,9 +4,8 @@ from enum import Enum
 from typing import Optional, Dict
 
 import numpy as np
-from std_msgs.msg import ColorRGBA
 
-from giskardpy.data_types.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
 from giskardpy.data_types.suturo_types import GraspTypes
 from giskardpy.goals.align_planes import AlignPlanes
@@ -1118,6 +1117,7 @@ class MoveAroundDishwasher(Goal):
                  tip_link: str,
                  reference_linear_velocity: float = 0.1,
                  weight: float = WEIGHT_ABOVE_CA,
+                 goal_angle: float = None,
                  name: str = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -1154,7 +1154,6 @@ class MoveAroundDishwasher(Goal):
         root_P_tip = root_T_tip.to_position()
         object_joint_angle = god_map.world.state[hinge_joint].position
 
-        # TODO: axis * offset add to door_P_handle
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(hinge_joint).axis)
         root_T_door_expr = god_map.world.compose_fk_expression(self.root_link, door_hinge_frame_id)
 
@@ -1176,7 +1175,10 @@ class MoveAroundDishwasher(Goal):
                                                     door_P_intermediate_point[2]])
 
             # # point w.r.t door
-            desired_angle = object_joint_angle * angle_multi  # just chose 1/2 of the goal angle
+            if goal_angle is None:
+                desired_angle = object_joint_angle * angle_multi  # just chose 1/2 of the goal angle
+            else:
+                desired_angle = goal_angle * angle_multi
 
             # find point w.r.t rotated door in local frame
             door_R_door_rotated = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,
@@ -1189,7 +1191,7 @@ class MoveAroundDishwasher(Goal):
 
             root_P_top_chain.append((root_P_top, goal_name))
 
-        old_position_monitor = None
+        old_position_monitor: ExpressionMonitor = None
 
         for i, (root_P_top, goal_name) in enumerate(root_P_top_chain):
             god_map.debug_expression_manager.add_debug_expression(f'goal_point_{goal_name}', root_P_top,
@@ -1326,8 +1328,10 @@ class GraspBarOffset(Goal):
                                         weight=self.weight)
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
-        god_map.debug_expression_manager.add_debug_expression('nearest', nearest)
-        god_map.debug_expression_manager.add_debug_expression('tip V tip grasp axis', tip_V_tip_grasp_axis)
+        god_map.debug_expression_manager.add_debug_expression('nearest', nearest,
+                                                              color=ColorRGBA(1, 0, 0, 1))
+        god_map.debug_expression_manager.add_debug_expression('tip V tip grasp axis', tip_V_tip_grasp_axis,
+                                                              color=ColorRGBA(0, 0.3, 0.7, 1))
 
 
 def check_context_element(name: str,

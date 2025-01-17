@@ -1,6 +1,7 @@
 from typing import Optional
 
 from giskardpy import casadi_wrapper as cas
+from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
@@ -63,7 +64,8 @@ class PrePushDoor(Goal):
         root_P_nearest_in_rotated_door = cas.dot(cas.TransMatrix(root_T_door), cas.Point3(door_P_nearest))
 
         god_map.debug_expression_manager.add_debug_expression('goal_point_on_plane',
-                                                              cas.Point3(root_P_nearest_in_rotated_door))
+                                                              cas.Point3(root_P_nearest_in_rotated_door),
+                                                              color=ColorRGBA(r=0, g=0.7, b=0.3, a=1))
 
         push_door_task = self.create_and_add_task('pre push door')
         push_door_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
