@@ -25,7 +25,7 @@ class PayloadForceTorque(PayloadMonitor):
                  topic: str,
                  # object_type is needed to differentiate between objects with different thresholds
                  # (not needed for door, just pass an empty string)
-                 object_type: str,
+                 object_type: Optional[str] = None,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -251,7 +251,7 @@ class GraspThresholdStrategy(ThresholdStrategy):
                 return False
 
         # case for grasping plate
-        # NOT CURRENTLY USED AS PLATES ARE NEITHER PLACED NOR PICKED UP
+        # NOT CURRENTLY USED AS PLATES ARE NEITHER PLACED NOR PICKED UP DUE TO HSRs GRIPPER
         elif self.object_type == ObjectTypes.OT_Plate.value:
 
             torque_threshold = 0.02
@@ -262,7 +262,6 @@ class GraspThresholdStrategy(ThresholdStrategy):
                 return False
             else:
                 return True
-            # raise Exception("HSR failed to Grasp Object, Grasping threshold has been Undershot.")
 
         # case for grasping Bowl
         elif self.object_type == ObjectTypes.OT_Bowl.value:

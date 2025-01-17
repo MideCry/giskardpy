@@ -27,6 +27,7 @@ class ObjectTypes(Enum):
     OT_Cutlery = 'Cutlery'
     OT_Plate = 'Plate'
     OT_Bowl = 'Bowl'
+    OT_Tray = 'Tray'
 
 
 # List of possible grasping directions
