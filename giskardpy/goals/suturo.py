@@ -1116,7 +1116,7 @@ class MoveAroundDishwasher(Goal):
                  handle_name: str,
                  root_link: str,
                  tip_link: str,
-                 tip_gripper_axis: cas.Vector3,
+                 tip_gripper_axis: cas.Vector3 = None,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
@@ -1146,9 +1146,6 @@ class MoveAroundDishwasher(Goal):
         self.reference_linear_velocity = reference_linear_velocity
         self.reference_angular_velocity = reference_angular_velocity
 
-        tip_gripper_axis.scale(1)
-        self.tip_gripper_axis = tip_gripper_axis
-
         self.handle_frame_id = self.tip_link = god_map.world.search_for_link_name(handle_name)
 
         hinge_joint = god_map.world.get_movable_parent_joint(self.handle_frame_id)
@@ -1164,9 +1161,15 @@ class MoveAroundDishwasher(Goal):
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(hinge_joint).axis)
         root_T_door_expr = god_map.world.compose_fk_expression(self.root_link, door_hinge_frame_id)
 
-        tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
-        root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
-        root_V_object_rotation_axis = cas.dot(root_T_door_expr, object_V_object_rotation_axis)
+        if tip_gripper_axis is not None:
+            tip_gripper_axis.scale(1)
+            self.tip_gripper_axis = tip_gripper_axis
+
+            tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
+            root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
+            root_V_object_rotation_axis = cas.dot(root_T_door_expr, object_V_object_rotation_axis)
+        else:
+            self.tip_gripper_axis = None
 
         door_P_handle = god_map.world.compute_fk(door_hinge_frame_id, self.handle_frame_id).to_position()
         temp_point = door_P_handle.to_np()
@@ -1228,7 +1231,7 @@ class MoveAroundDishwasher(Goal):
                                             weight=self.weight)
 
             # Add Vector-Align for better aligment to push later
-            if i == len(root_P_top_chain) - 1:
+            if i == len(root_P_top_chain) - 1 and self.tip_gripper_axis is not None:
                 task.add_vector_goal_constraints(frame_V_current=root_V_tip_grasp_axis,
                                                  frame_V_goal=root_V_object_rotation_axis,
                                                  reference_velocity=self.reference_angular_velocity,
