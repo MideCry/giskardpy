@@ -5,8 +5,8 @@ from typing import Optional, Dict
 
 import numpy as np
 
-from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.data_types.suturo_types import GraspTypes
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
@@ -556,6 +556,7 @@ class Retracting(ObjectGoal):
 
 class AlignHeight(ObjectGoal):
     goal_pose: cas.TransMatrix
+
     def __init__(self,
                  from_above: bool = False,
                  name: str = None,
@@ -1115,7 +1116,9 @@ class MoveAroundDishwasher(Goal):
                  handle_name: str,
                  root_link: str,
                  tip_link: str,
+                 tip_gripper_axis: cas.Vector3,
                  reference_linear_velocity: float = 0.1,
+                 reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  goal_angle: float = None,
                  name: str = None,
@@ -1141,6 +1144,10 @@ class MoveAroundDishwasher(Goal):
 
         self.weight = weight
         self.reference_linear_velocity = reference_linear_velocity
+        self.reference_angular_velocity = reference_angular_velocity
+
+        tip_gripper_axis.scale(1)
+        self.tip_gripper_axis = tip_gripper_axis
 
         self.handle_frame_id = self.tip_link = god_map.world.search_for_link_name(handle_name)
 
@@ -1156,6 +1163,10 @@ class MoveAroundDishwasher(Goal):
 
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(hinge_joint).axis)
         root_T_door_expr = god_map.world.compose_fk_expression(self.root_link, door_hinge_frame_id)
+
+        tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
+        root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
+        root_V_object_rotation_axis = cas.dot(root_T_door_expr, object_V_object_rotation_axis)
 
         door_P_handle = god_map.world.compute_fk(door_hinge_frame_id, self.handle_frame_id).to_position()
         temp_point = door_P_handle.to_np()
@@ -1215,6 +1226,13 @@ class MoveAroundDishwasher(Goal):
                                             frame_P_goal=root_P_top,
                                             reference_velocity=self.reference_linear_velocity,
                                             weight=self.weight)
+
+            # Add Vector-Align for better aligment to push later
+            if i == len(root_P_top_chain) - 1:
+                task.add_vector_goal_constraints(frame_V_current=root_V_tip_grasp_axis,
+                                                 frame_V_goal=root_V_object_rotation_axis,
+                                                 reference_velocity=self.reference_angular_velocity,
+                                                 weight=self.weight)
 
             task.hold_condition = hold_condition
 
