@@ -6,7 +6,7 @@ from typing import Optional, Dict
 import numpy as np
 from std_msgs.msg import ColorRGBA
 
-from data_types.suturo_types import ObjectTypes
+from giskardpy.data_types.suturo_types import ObjectTypes
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
 from giskardpy.data_types.suturo_types import GraspTypes
