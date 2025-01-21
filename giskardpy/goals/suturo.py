@@ -4,9 +4,11 @@ from enum import Enum
 from typing import Optional, Dict
 
 import numpy as np
+from std_msgs.msg import ColorRGBA
 
+from data_types.suturo_types import ObjectTypes
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
-from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.data_types.suturo_types import GraspTypes
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
@@ -160,17 +162,25 @@ class Reaching(ObjectGoal):
         # TODO: Offsets korrekt berechnen
         # TODO: Weitere Objekte einfügen
         if self.object_shape == 'sphere' or self.object_shape == 'cylinder':
-            self.offsets = cas.Vector3.from_xyz(x=self.object_size.x, y=self.object_size.x, z=self.object_size.z)
+            self.offsets = cas.Vector3.from_xyz(x=self.object_size.x, y=self.object_size.y, z=self.object_size.z)
 
         # TODO: fine tune and add correct object names
-        elif self.object_name == 'plate':
-            self.offsets = -(self.object_size.x / 2) + 0.03
+        elif self.object_name == 'Plate':
+            self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 2) + 0.03, y=self.object_size.y,
+                                                z=self.object_size.z)
 
-        elif self.object_name == 'bowl':
-            self.offsets = -(object_size.x / 2) + 0.15
+        elif self.object_name == 'Bowl':
+            self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 2) + 0.15, y=self.object_size.y,
+                                                z=self.object_size.z)
 
-        elif self.object_name == 'cutlery':
-            self.offsets = -(self.object_size.x / 2) + 0.02
+        elif self.object_name == 'Cutlery':
+            self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 2) + 0.02, y=self.object_size.y,
+                                                z=self.object_size.z)
+
+        # TODO: Add proper case for Tray (calculate proper offset)
+        elif self.object_name == ObjectTypes.OT_Tray.value:
+            self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 3), y=self.object_size.y,
+                                                z=self.object_size.z)
 
         else:
             if self.object_in_world:
@@ -200,8 +210,8 @@ class GraspObject(ObjectGoal):
     def __init__(self,
                  goal_pose: cas.TransMatrix,
                  align: str,
+                 grasp: str,
                  offsets: cas.Vector3 = cas.Vector3.from_xyz(0, 0, 0),
-                 grasp: str = 'front',
                  name: Optional[str] = None,
                  reference_frame_alignment: Optional[str] = None,
                  root_link: Optional[PrefixName] = None,
@@ -291,14 +301,16 @@ class GraspObject(ObjectGoal):
             self.goal_point.z -= self.offsets.z
 
         elif self.grasp == GraspTypes.FRONT.value:
+           # v = cas.Vector3.from_xyz(0, 2, 0)
             self.goal_vertical_axis.x = self.standard_up.x
-            self.goal_vertical_axis.y = self.standard_up.y
+            self.goal_vertical_axis.y = self.standard_up.y #v.y
             self.goal_vertical_axis.z = self.standard_up.z
-            self.goal_frontal_axis.x = self.standard_up.x
-            self.goal_frontal_axis.y = self.standard_up.y
-            self.goal_frontal_axis.z = self.standard_up.z
+            self.goal_frontal_axis.x = self.standard_forward.x #self.standard_up.x
+            self.goal_frontal_axis.y = self.standard_forward.y #self.standard_up.y
+            self.goal_frontal_axis.z = self.standard_forward.z #self.standard_up.z
 
             self.goal_point.z -= 0.01
+            #self.goal_point.x += self.offsets.x
 
         elif self.grasp == GraspTypes.LEFT.value:
             self.goal_vertical_axis.x = self.standard_up.x
@@ -1116,11 +1128,8 @@ class MoveAroundDishwasher(Goal):
                  handle_name: str,
                  root_link: str,
                  tip_link: str,
-                 tip_gripper_axis: cas.Vector3 = None,
                  reference_linear_velocity: float = 0.1,
-                 reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
-                 goal_angle: float = None,
                  name: str = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -1144,7 +1153,6 @@ class MoveAroundDishwasher(Goal):
 
         self.weight = weight
         self.reference_linear_velocity = reference_linear_velocity
-        self.reference_angular_velocity = reference_angular_velocity
 
         self.handle_frame_id = self.tip_link = god_map.world.search_for_link_name(handle_name)
 
@@ -1158,18 +1166,9 @@ class MoveAroundDishwasher(Goal):
         root_P_tip = root_T_tip.to_position()
         object_joint_angle = god_map.world.state[hinge_joint].position
 
+        # TODO: axis * offset add to door_P_handle
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(hinge_joint).axis)
         root_T_door_expr = god_map.world.compose_fk_expression(self.root_link, door_hinge_frame_id)
-
-        if tip_gripper_axis is not None:
-            tip_gripper_axis.scale(1)
-            self.tip_gripper_axis = tip_gripper_axis
-
-            tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
-            root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
-            root_V_object_rotation_axis = cas.dot(root_T_door_expr, object_V_object_rotation_axis)
-        else:
-            self.tip_gripper_axis = None
 
         door_P_handle = god_map.world.compute_fk(door_hinge_frame_id, self.handle_frame_id).to_position()
         temp_point = door_P_handle.to_np()
@@ -1189,10 +1188,7 @@ class MoveAroundDishwasher(Goal):
                                                     door_P_intermediate_point[2]])
 
             # # point w.r.t door
-            if goal_angle is None:
-                desired_angle = object_joint_angle * angle_multi  # just chose 1/2 of the goal angle
-            else:
-                desired_angle = goal_angle * angle_multi
+            desired_angle = object_joint_angle * angle_multi  # just chose 1/2 of the goal angle
 
             # find point w.r.t rotated door in local frame
             door_R_door_rotated = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,
@@ -1205,7 +1201,7 @@ class MoveAroundDishwasher(Goal):
 
             root_P_top_chain.append((root_P_top, goal_name))
 
-        old_position_monitor: ExpressionMonitor = None
+        old_position_monitor = None
 
         for i, (root_P_top, goal_name) in enumerate(root_P_top_chain):
             god_map.debug_expression_manager.add_debug_expression(f'goal_point_{goal_name}', root_P_top,
@@ -1229,13 +1225,6 @@ class MoveAroundDishwasher(Goal):
                                             frame_P_goal=root_P_top,
                                             reference_velocity=self.reference_linear_velocity,
                                             weight=self.weight)
-
-            # Add Vector-Align for better aligment to push later
-            if i == len(root_P_top_chain) - 1 and self.tip_gripper_axis is not None:
-                task.add_vector_goal_constraints(frame_V_current=root_V_tip_grasp_axis,
-                                                 frame_V_goal=root_V_object_rotation_axis,
-                                                 reference_velocity=self.reference_angular_velocity,
-                                                 weight=self.weight)
 
             task.hold_condition = hold_condition
 
@@ -1349,10 +1338,8 @@ class GraspBarOffset(Goal):
                                         weight=self.weight)
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
-        god_map.debug_expression_manager.add_debug_expression('nearest', nearest,
-                                                              color=ColorRGBA(1, 0, 0, 1))
-        god_map.debug_expression_manager.add_debug_expression('tip V tip grasp axis', tip_V_tip_grasp_axis,
-                                                              color=ColorRGBA(0, 0.3, 0.7, 1))
+        god_map.debug_expression_manager.add_debug_expression('nearest', nearest)
+        god_map.debug_expression_manager.add_debug_expression('tip V tip grasp axis', tip_V_tip_grasp_axis)
 
 
 def check_context_element(name: str,
