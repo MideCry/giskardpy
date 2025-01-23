@@ -177,7 +177,7 @@ class Reaching(ObjectGoal):
             self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 2) + 0.02, y=self.object_size.y,
                                                 z=self.object_size.z)
 
-        # TODO: Add proper case for Tray (calculate proper offset)
+        # TODO: Add proper case for Tray (calculate proper offset for final Tray)
         elif self.object_name == ObjectTypes.OT_Tray.value:
             self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 3), y=self.object_size.y,
                                                 z=self.object_size.z)
@@ -280,6 +280,7 @@ class GraspObject(ObjectGoal):
 
         self.goal_point = god_map.world.transform(self.reference_link, root_goal_point)
 
+        # TODO: Refactor so that grasping from above can be used with Tray
         if self.grasp == GraspTypes.ABOVE.value:
             self.goal_vertical_axis.x = self.standard_forward.x
             self.goal_vertical_axis.y = self.standard_forward.y
@@ -700,6 +701,7 @@ class Placing(ObjectGoal):
     def __init__(self,
                  goal_pose: cas.TransMatrix,
                  align: str,
+                 grasp: str,
                  name: str = None,
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
@@ -728,6 +730,7 @@ class Placing(ObjectGoal):
         self.velocity = velocity
         self.weight = weight
         self.align = align
+        self.grasp = grasp
 
         # self.from_above = check_context_element('from_above', ContextFromAbove, context)
 
@@ -742,8 +745,8 @@ class Placing(ObjectGoal):
         self.root_link = god_map.world.search_for_link_name(root_link)
         self.tip_link = god_map.world.search_for_link_name(tip_link)
         self.add_constraints_of_goal(GraspObject(goal_pose=self.goal_pose,
-                                                 align='',
-                                                 grasp='',
+                                                 align=self.align,
+                                                 grasp=self.grasp,
                                                  root_link=self.root_link.short_name,
                                                  tip_link=self.tip_link.short_name,
                                                  velocity=self.velocity,

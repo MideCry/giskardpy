@@ -155,10 +155,20 @@ class GraspThresholdStrategy(ThresholdStrategy):
             else:
                 return False
 
+        # case for Grasping Tray
+        elif self.object_type == ObjectTypes.OT_Tray.value:
+
+            force_threshold = 60.0
+
+            # TODO: change to correct Axis
+            if abs(rob_force[1]) > force_threshold:
+                get_middleware().loginfo(f'HIT GWC: {rob_force[1]}')
+                return True
+            else:
+                return False
         # if no valid object_type has been declared in method parameters
         else:
             raise Exception("No valid object_type found, unable to determine placing thresholds!")
-
 
 class PlaceThresholdStrategy(ThresholdStrategy):
     def __init__(self, object_type):
@@ -213,6 +223,18 @@ class PlaceThresholdStrategy(ThresholdStrategy):
 
             if abs(rob_force[2]) >= force_z_threshold:
 
+                get_middleware().loginfo(
+                    f'HIT PLACING: Z:{rob_force[2]}')
+                return True
+            else:
+                return False
+
+        # case for Placing Tray
+        elif self.object_type == ObjectTypes.OT_Tray.value:
+
+            # TODO: change to correct Axis
+            force_z_threshold = 35
+            if abs(rob_force[2]) >= force_z_threshold:
                 get_middleware().loginfo(
                     f'HIT PLACING: Z:{rob_force[2]}')
                 return True
