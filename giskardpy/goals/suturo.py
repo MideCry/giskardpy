@@ -180,7 +180,7 @@ class Reaching(ObjectGoal):
         # TODO: Add proper case for Tray (calculate proper offset for final Tray)
         elif self.object_name == ObjectTypes.OT_Tray.value:
             self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 3), y=self.object_size.y,
-                                                z=self.object_size.z)
+                                                z=self.object_size.z - 0.05)
 
         else:
             if self.object_in_world:
@@ -876,6 +876,15 @@ class TakePose(Goal):
             arm_roll_joint = 0.0
             wrist_flex_joint = -0.19
             wrist_roll_joint = 0.0
+
+        elif pose_keyword == 'pre_tray':
+            head_pan_joint = 0.0
+            head_tilt_joint = 0.0
+            arm_lift_joint = 0.6
+            arm_flex_joint = -1.44
+            arm_roll_joint = 0.0
+            wrist_flex_joint = -1.22
+            wrist_roll_joint = np.pi / 2
 
         else:
             get_middleware().loginfo(f'{pose_keyword} is not a valid pose')
