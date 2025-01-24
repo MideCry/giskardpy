@@ -45,16 +45,18 @@ class PayloadForceTorque(PayloadMonitor):
         :param end_condition: the end condition of the monitor
         """
 
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+                         end_condition=end_condition, run_call_in_thread=False)
         self.object_type = object_type
         self.threshold_enum = threshold_enum
         self.topic = topic
         self.wrench = WrenchStamped()
-        self.bf = god_map.world.search_for_link_name('base_footprint')
+        self.strategy = ThresholdStrategyFactory.get_strategy(self.object_type, self.threshold_enum)
+        self.reference_frame = god_map.world.search_for_link_name(self.strategy.reference_frame)
         self.sensor_frame = god_map.world.search_for_link_name(wait_for_message(topic, WrenchStamped).header.frame_id)
         self.subscriber = rospy.Subscriber(name=topic,
                                            data_class=WrenchStamped, callback=self.cb)
-        self.strategy = ThresholdStrategyFactory.get_strategy(self.object_type, self.threshold_enum)
+
 
     def cb(self, data: WrenchStamped):
         self.rob_force, self.rob_torque = self.force_T_base_transform(data)
@@ -75,9 +77,9 @@ class PayloadForceTorque(PayloadMonitor):
         vstampT = cas.Vector3.from_xyz(wrench.wrench.torque.x, wrench.wrench.torque.y, wrench.wrench.torque.z,
                                        wrench.header.frame_id)
 
-        force_transformed = symbol_manager.evaluate_expr(god_map.world.transform(self.bf, vstampF))
+        force_transformed = symbol_manager.evaluate_expr(god_map.world.transform(self.reference_frame, vstampF))
 
-        torque_transformed = symbol_manager.evaluate_expr(god_map.world.transform(self.bf, vstampT))
+        torque_transformed = symbol_manager.evaluate_expr(god_map.world.transform(self.reference_frame, vstampT))
 
         # print("Force:", force_transformed.vector.x, force_transformed.vector.y, force_transformed.vector.z)
         # print("Torque:", torque_transformed.vector.x, torque_transformed.vector.y, torque_transformed.vector.z)
@@ -99,6 +101,8 @@ class PayloadForceTorque(PayloadMonitor):
 
 
 class ThresholdStrategy:
+    reference_frame: str = 'base_footprint'
+
     def check_thresholds(self, rob_force, rob_torque):
         raise NotImplementedError("This method should be overridden.")
 
@@ -169,6 +173,7 @@ class GraspThresholdStrategy(ThresholdStrategy):
         # if no valid object_type has been declared in method parameters
         else:
             raise Exception("No valid object_type found, unable to determine placing thresholds!")
+
 
 class PlaceThresholdStrategy(ThresholdStrategy):
     def __init__(self, object_type):
@@ -246,13 +251,14 @@ class PlaceThresholdStrategy(ThresholdStrategy):
 
 
 class DoorThresholdStrategy(ThresholdStrategy):
+    reference_frame = 'hand_gripper_tool_frame'
 
     def check_thresholds(self, rob_force, rob_torque):
-        force_x_threshold = 40
+        force_z_threshold = 40
 
-        if abs(rob_force[0]) >= force_x_threshold:
+        if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(
-                f'HIT DOOR!: X:{rob_force[0]}')
+                f'HIT DOOR!: X:{rob_force[2]}')
             return True
         else:
             return False
