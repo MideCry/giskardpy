@@ -258,7 +258,7 @@ class DoorThresholdStrategy(ThresholdStrategy):
 
         if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(
-                f'HIT DOOR!: X:{rob_force[2]}')
+                f'HIT DOOR!: Z:{rob_force[2]}')
             return True
         else:
             return False
