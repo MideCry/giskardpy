@@ -1127,12 +1127,20 @@ class OpenDoorGoal(Goal):
 
 
 class MoveAroundDishwasher(Goal):
+    old_position_monitor: ExpressionMonitor = None
+    tip_gripper_axis: cas.Vector3 = None
+    root_V_tip_grasp_axis: cas.Vector3 = None
+    root_V_object_rotation_axis: cas.Vector3 = None
+
     def __init__(self,
                  handle_name: str,
                  root_link: str,
                  tip_link: str,
+                 tip_gripper_axis: cas.Vector3 = None,
                  reference_linear_velocity: float = 0.1,
+                 reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
+                 goal_angle: float = None,
                  name: str = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -1156,6 +1164,7 @@ class MoveAroundDishwasher(Goal):
 
         self.weight = weight
         self.reference_linear_velocity = reference_linear_velocity
+        self.reference_angular_velocity = reference_angular_velocity
 
         self.handle_frame_id = self.tip_link = god_map.world.search_for_link_name(handle_name)
 
@@ -1169,9 +1178,16 @@ class MoveAroundDishwasher(Goal):
         root_P_tip = root_T_tip.to_position()
         object_joint_angle = god_map.world.state[hinge_joint].position
 
-        # TODO: axis * offset add to door_P_handle
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(hinge_joint).axis)
         root_T_door_expr = god_map.world.compose_fk_expression(self.root_link, door_hinge_frame_id)
+
+        if tip_gripper_axis is not None:
+            tip_gripper_axis.scale(1)
+            self.tip_gripper_axis = tip_gripper_axis
+
+            tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
+            self.root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
+            self.root_V_object_rotation_axis = cas.dot(root_T_door_expr, object_V_object_rotation_axis)
 
         door_P_handle = god_map.world.compute_fk(door_hinge_frame_id, self.handle_frame_id).to_position()
         temp_point = door_P_handle.to_np()
@@ -1191,7 +1207,10 @@ class MoveAroundDishwasher(Goal):
                                                     door_P_intermediate_point[2]])
 
             # # point w.r.t door
-            desired_angle = object_joint_angle * angle_multi  # just chose 1/2 of the goal angle
+            if goal_angle is None:
+                desired_angle = object_joint_angle * angle_multi  # just chose 1/2 of the goal angle
+            else:
+                desired_angle = goal_angle * angle_multi
 
             # find point w.r.t rotated door in local frame
             door_R_door_rotated = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,
@@ -1204,20 +1223,18 @@ class MoveAroundDishwasher(Goal):
 
             root_P_top_chain.append((root_P_top, goal_name))
 
-        old_position_monitor = None
-
         for i, (root_P_top, goal_name) in enumerate(root_P_top_chain):
             god_map.debug_expression_manager.add_debug_expression(f'goal_point_{goal_name}', root_P_top,
                                                                   color=ColorRGBA(0, 0.5, 0.5, 1))
 
             task = self.create_and_add_task(goal_name)
 
-            if old_position_monitor is None:
+            if self.old_position_monitor is None:
                 position_monitor = ExpressionMonitor(name=goal_name,
                                                      start_condition=w.TrueSymbol)
             else:
                 position_monitor = ExpressionMonitor(name=goal_name,
-                                                     start_condition=old_position_monitor.get_state_expression())
+                                                     start_condition=self.old_position_monitor.get_state_expression())
 
             distance_to_point = cas.euclidean_distance(root_P_tip, root_P_top)
             point_reached = cas.less(distance_to_point, 0.01)
@@ -1229,6 +1246,13 @@ class MoveAroundDishwasher(Goal):
                                             reference_velocity=self.reference_linear_velocity,
                                             weight=self.weight)
 
+            # Add Vector-Align for better alignment to push later
+            if i == len(root_P_top_chain) - 1 and self.tip_gripper_axis is not None:
+                task.add_vector_goal_constraints(frame_V_current=self.root_V_tip_grasp_axis,
+                                                 frame_V_goal=self.root_V_object_rotation_axis,
+                                                 reference_velocity=self.reference_angular_velocity,
+                                                 weight=self.weight)
+
             task.hold_condition = hold_condition
 
             if i == 0:
@@ -1236,13 +1260,13 @@ class MoveAroundDishwasher(Goal):
                 task.end_condition = position_monitor.get_state_expression()
             elif i == len(root_P_top_chain) - 1:
                 end_con = cas.logic_and(end_condition, position_monitor.get_state_expression())
-                task.start_condition = old_position_monitor.get_state_expression()
+                task.start_condition = self.old_position_monitor.get_state_expression()
                 task.end_condition = end_con
             else:
-                task.start_condition = old_position_monitor.get_state_expression()
+                task.start_condition = self.old_position_monitor.get_state_expression()
                 task.end_condition = position_monitor.get_state_expression()
 
-            old_position_monitor = position_monitor
+            self.old_position_monitor = position_monitor
 
 
 class GraspBarOffset(Goal):
