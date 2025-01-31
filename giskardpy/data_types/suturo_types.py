@@ -38,3 +38,15 @@ class GraspTypes(Enum):
     LEFT = 'left'
     RIGHT = 'right'
     BELOW = 'below'
+
+
+# List of possible poses
+@unique
+class TakePoseTypes(Enum):
+    PARK = 'park'
+    PERCEIVE = 'perceive'
+    ASSISTANCE = 'assistance'
+    PRE_ALIGN_HEIGHT = 'pre_align_height'
+    CARRY = 'carry'
+    TEST = 'test'
+    PRE_TRAY = 'pre_tray'
