@@ -6,7 +6,7 @@ from typing import Optional, Dict
 import numpy as np
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.data_types.suturo_types import ObjectTypes
+from giskardpy.data_types.suturo_types import ObjectTypes, TakePoseTypes
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
 from giskardpy.data_types.suturo_types import GraspTypes
@@ -757,10 +757,10 @@ class Placing(ObjectGoal):
 
     # might need to be removed in the future, as soon as the old interface isn't in use anymore
 
-    def recovery_modifier(self) -> Dict:
-        joint_states = {'arm_lift_joint': 0.03}
-
-        return joint_states
+    # def recovery_modifier(self) -> Dict:
+    #     joint_states = {'arm_lift_joint': 0.03}
+    #
+    #     return joint_states
 
 
 class Tilting(Goal):
@@ -823,7 +823,7 @@ class TakePose(Goal):
             name = f'TakePose-{pose_keyword}'
         super().__init__(name)
 
-        if pose_keyword == 'park':
+        if pose_keyword == TakePoseTypes.PARK.value:
             head_pan_joint = 0.0
             head_tilt_joint = 0.0
             arm_lift_joint = 0.0
@@ -832,7 +832,7 @@ class TakePose(Goal):
             wrist_flex_joint = -1.5
             wrist_roll_joint = 0.0
 
-        elif pose_keyword == 'perceive':
+        elif pose_keyword == TakePoseTypes.PERCEIVE.value:
             head_pan_joint = 0.0
             head_tilt_joint = -0.65
             arm_lift_joint = 0.25
@@ -841,7 +841,7 @@ class TakePose(Goal):
             wrist_flex_joint = -1.5
             wrist_roll_joint = 0.0
 
-        elif pose_keyword == 'assistance':
+        elif pose_keyword == TakePoseTypes.ASSISTANCE.value:
             head_pan_joint = 0.0
             head_tilt_joint = 0.0
             arm_lift_joint = 0.0
@@ -850,7 +850,7 @@ class TakePose(Goal):
             wrist_flex_joint = -1.5
             wrist_roll_joint = 1.6
 
-        elif pose_keyword == 'pre_align_height':
+        elif pose_keyword == TakePoseTypes.PRE_ALIGN_HEIGHT.value:
             head_pan_joint = 0.0
             head_tilt_joint = 0.0
             arm_lift_joint = 0.0
@@ -859,7 +859,7 @@ class TakePose(Goal):
             wrist_flex_joint = -1.5
             wrist_roll_joint = 0.0
 
-        elif pose_keyword == 'carry':
+        elif pose_keyword == TakePoseTypes.CARRY.value:
             head_pan_joint = 0.0
             head_tilt_joint = -0.65
             arm_lift_joint = 0.0
@@ -868,7 +868,7 @@ class TakePose(Goal):
             wrist_flex_joint = -1.17
             wrist_roll_joint = -1.62
 
-        elif pose_keyword == 'test':
+        elif pose_keyword == TakePoseTypes.TEST.value:
             head_pan_joint = 0.0
             head_tilt_joint = 0.0
             arm_lift_joint = 0.38
@@ -877,7 +877,7 @@ class TakePose(Goal):
             wrist_flex_joint = -0.19
             wrist_roll_joint = 0.0
 
-        elif pose_keyword == 'pre_tray':
+        elif pose_keyword == TakePoseTypes.PRE_TRAY.value:
             head_pan_joint = 0.0
             head_tilt_joint = 0.0
             arm_lift_joint = 0.6
