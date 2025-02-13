@@ -65,3 +65,9 @@ qtcreator-*
 # Catkin custom files
 CATKIN_IGNORE
 
+/.idea/giskardpy.iml
+/.idea/modules.xml
+/giskardpy.egg-info/PKG-INFO
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/workspace.xml
