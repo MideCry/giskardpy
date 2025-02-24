@@ -44,6 +44,7 @@ class GraspTypes(Enum):
 @unique
 class TakePoseTypes(Enum):
     PARK = 'park'
+    PARK_LEFT = 'park_left'
     PERCEIVE = 'perceive'
     ASSISTANCE = 'assistance'
     PRE_ALIGN_HEIGHT = 'pre_align_height'
