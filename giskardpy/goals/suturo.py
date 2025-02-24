@@ -832,6 +832,15 @@ class TakePose(Goal):
             wrist_flex_joint = -1.5
             wrist_roll_joint = 0.0
 
+        elif pose_keyword == TakePoseTypes.PARK_LEFT.value:
+            head_pan_joint = 0.0
+            head_tilt_joint = 0.0
+            arm_lift_joint = 0.0
+            arm_flex_joint = 0.0
+            arm_roll_joint = 1.5
+            wrist_flex_joint = -1.5
+            wrist_roll_joint = 0.0
+
         elif pose_keyword == TakePoseTypes.PERCEIVE.value:
             head_pan_joint = 0.0
             head_tilt_joint = -0.65
@@ -1086,7 +1095,7 @@ class OpenDoorGoal(Goal):
                                                 name=f'{name}_handle_joint_monitor')
         self.add_monitor(handle_state_monitor)
 
-        sleep_mon = Sleep(seconds=2,
+        sleep_mon = Sleep(seconds=0.5,
                           start_condition=handle_state_monitor.get_state_expression())
         self.add_monitor(sleep_mon)
 
