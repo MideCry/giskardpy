@@ -9,7 +9,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 
 
 class JointVelocityLimit(Goal):
@@ -195,6 +195,69 @@ class JointPositionList(Goal):
 
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
+
+# TODO: add Interface (use in Door-opening)
+class JointPositionListStop(Goal):
+    def __init__(self,
+                 goal_state: Dict[str, float],
+                 group_name: Optional[str] = None,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 max_velocity: float = 1,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        """
+        Calls JointPosition for a list of joints.
+        :param goal_state: maps joint_name to goal position
+        :param group_name: if joint_name is not unique, search in this group for matches.
+        :param weight:
+        """
+        self.current_positions = []
+        self.goal_positions = []
+        self.velocity_limits = []
+        self.names = []
+        self.joint_names = list(sorted(goal_state.keys()))
+        if name is None:
+            name = f'{self.__class__.__name__} {self.joint_names}'
+        super().__init__(name)
+        self.weight = weight
+        if len(goal_state) == 0:
+            raise GoalInitalizationException(f'Can\'t initialize {self} with no joints.')
+        for joint_name, goal_position in goal_state.items():
+            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
+
+            ll_pos, ul_pos = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
+            if ll_pos is not None:
+                goal_position = min(ul_pos, max(ll_pos, goal_position))
+
+            ll_vel, ul_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
+            velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
+
+            joint: OneDofJoint = god_map.world.joints[joint_name]
+            self.names.append(str(joint_name))
+            self.current_positions.append(joint.get_symbol(Derivatives.position))
+            self.goal_positions.append(goal_position)
+            self.velocity_limits.append(velocity_limit)
+
+        task = self.create_and_add_task('joint goal')
+        for name, current, velocity_limit in zip(self.names, self.current_positions, self.velocity_limits):
+
+            goal = god_map.world.state[name].position
+
+            if god_map.world.is_joint_continuous(name):
+                error = cas.shortest_angular_distance(current, goal)
+            else:
+                error = goal - current
+
+            task.add_equality_constraint(name=name,
+                                         reference_velocity=velocity_limit,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current)
+            god_map.debug_expression_manager.add_debug_expression(name, goal)
+
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 class JointSignWave(Goal):
     def __init__(self, name: str, joint_name: str,
