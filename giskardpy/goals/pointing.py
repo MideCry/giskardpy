@@ -81,7 +81,7 @@ class PointingCone(Goal):
                  goal_point: cas.Point3,
                  root_link: PrefixName,
                  pointing_axis: cas.Vector3,
-                 cone_theta: float = 0.0,
+                 cone_theta: float = 0.3,
                  max_velocity: float = 0.3,
                  threshold: float = 0.01,
                  weight: float = WEIGHT_BELOW_CA,
@@ -131,6 +131,12 @@ class PointingCone(Goal):
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
 
         root_V_goal_axis_proj = cas.project_to_cone(root_V_pointing_axis, root_V_goal_axis, cone_theta)
+
+        angle = cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis)
+        root_V_goal_axis_proj = cas.if_less_eq(angle, np.pi / 1.9,
+                                               if_result=root_V_goal_axis_proj,
+                                               else_result=root_V_goal_axis)
+
         root_V_goal_axis_proj.vis_frame = self.tip
         god_map.debug_expression_manager.add_debug_expression('cone_axis',
                                                               root_V_goal_axis,
@@ -144,5 +150,6 @@ class PointingCone(Goal):
                                          frame_V_goal=root_V_goal_axis_proj,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-        self.observation_expression = cas.less_equal(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis_proj), threshold)
+        self.observation_expression = cas.less_equal(
+            cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis_proj), threshold)
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

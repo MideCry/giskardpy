@@ -114,14 +114,18 @@ class GraspThresholdStrategy(ThresholdStrategy):
     def check_thresholds(self, rob_force, rob_torque):
         # Implement the logic for checking thresholds in GRASP context case for grasping "normal" objects
         # (namely Milk, Cereal and cups)
+        get_middleware().logerr(f'OBJECT:{self.object_type}')
         if self.object_type == ObjectTypes.OT_Default.value:
 
             torque_threshold = 2
 
             if abs(rob_torque[1]) > torque_threshold:
                 get_middleware().loginfo(f'HIT GWC: TORQUE_Y:{rob_torque[1]}')
+                print(f'HIT GWC: {rob_torque[1]}')
                 return True
             else:
+                get_middleware().loginfo(f'MISS GWC: {rob_torque[1]}')
+                print(f'MISS GWC: {rob_torque[1]}')
                 return False
 
         # case for grasping cutlery
@@ -151,12 +155,15 @@ class GraspThresholdStrategy(ThresholdStrategy):
         # case for grasping Bowl
         elif self.object_type == ObjectTypes.OT_Bowl.value:
 
-            force_threshold = 50.0
+            force_threshold = 16
 
-            if abs(rob_force[2]) > force_threshold:
+            if abs(rob_force[2]) >= force_threshold:
                 get_middleware().loginfo(f'HIT GWC: {rob_force[2]}')
+                print(f'HIT GWC: {rob_force[2]}')
                 return True
             else:
+                get_middleware().loginfo(f'MISS GWC: {rob_force[2]}')
+                print(f'MISS GWC: {rob_force[2]}')
                 return False
 
         # case for Grasping Tray

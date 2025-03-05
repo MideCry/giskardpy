@@ -317,6 +317,69 @@ class Task(MotionGraphNode):
                                                    f'{name}/trans/y',
                                                    f'{name}/trans/z'])
 
+
+    def add_vector_goal_constraints_fov(self,
+                                    frame_V_current: cas.Vector3,
+                                    frame_V_goal: cas.Vector3,
+                                    reference_velocity: cas.symbol_expr_float,
+                                        fov: float = 0,
+                                    weight: cas.symbol_expr_float = WEIGHT_BELOW_CA,
+                                    name: str = ''):
+        """
+        Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
+        relative to the same frame and are normalized to a length of 1.
+        :param frame_V_current: a vector describing a 3D vector
+        :param frame_V_goal: a vector describing a 3D vector
+        :param reference_velocity: rad/s
+        :param weight:
+        :param name:
+        """
+        angle = cas.save_acos(frame_V_current.dot(frame_V_goal))
+        # avoid singularity by staying away from pi
+        angle_limited_min = cas.min(cas.max(angle-fov, -reference_velocity), reference_velocity)
+        angle_limited_min = cas.save_division(angle_limited_min, angle-fov)
+        root_V_goal_normal_intermediate_min = cas.slerp(frame_V_current, frame_V_goal, angle_limited_min)
+        root_V_goal_normal_intermediate_min.vis_frame = 'hsrb/head_center_camera_frame'
+        error_min = root_V_goal_normal_intermediate_min - frame_V_current
+
+        angle_limited_max = cas.min(cas.max(angle+fov, -reference_velocity), reference_velocity)
+        angle_limited_max = cas.save_division(angle_limited_max, angle+fov)
+        root_V_goal_normal_intermediate_max = cas.slerp(frame_V_current, frame_V_goal, angle_limited_max)
+        root_V_goal_normal_intermediate_max.vis_frame = 'hsrb/head_center_camera_frame'
+
+        error_max = root_V_goal_normal_intermediate_max - frame_V_current
+
+        god_map.debug_expression_manager.add_debug_expression(name='root_V_goal_normal_intermediate_min',
+                                                              expression=root_V_goal_normal_intermediate_min)
+
+        god_map.debug_expression_manager.add_debug_expression(name='root_V_goal_normal_intermediate_max',
+                                                              expression=root_V_goal_normal_intermediate_max)
+
+        god_map.debug_expression_manager.add_debug_expression(name='-fov',
+                                                              expression=angle - fov)
+        god_map.debug_expression_manager.add_debug_expression(name='+fov',
+                                                              expression=angle + fov)
+        god_map.debug_expression_manager.add_debug_expression(name='fov',
+                                                              expression=fov)
+        god_map.debug_expression_manager.add_debug_expression(name='angle_limited_max',
+                                                              expression=angle_limited_max)
+        god_map.debug_expression_manager.add_debug_expression(name='angle_limited_min',
+                                                              expression=angle_limited_min)
+
+
+        self.add_inequality_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                            lower_errors=[cas.min(error_min[0], error_max[0]),
+                                                          cas.min(error_min[1], error_max[1]),
+                                                          cas.min(error_min[2], error_max[2])],
+                                              upper_errors=[cas.max(error_min[0], error_max[0]),
+                                                          cas.max(error_min[1], error_max[1]),
+                                                          cas.max(error_min[2], error_max[2])],
+                                            weights=[weight] * 3,
+                                            task_expression=frame_V_current[:3],
+                                            names=[f'{name}/trans/x',
+                                                   f'{name}/trans/y',
+                                                   f'{name}/trans/z'])
+
     def add_rotation_goal_constraints(self,
                                       frame_R_current: cas.RotationMatrix,
                                       frame_R_goal: cas.RotationMatrix,
