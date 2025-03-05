@@ -221,15 +221,12 @@ class JointPositionListStop(Goal):
         if name is None:
             name = f'{self.__class__.__name__} {self.joint_names}'
         super().__init__(name)
+        self.max_velocity = max_velocity
         self.weight = weight
         if len(goal_state) == 0:
             raise GoalInitalizationException(f'Can\'t initialize {self} with no joints.')
-        for joint_name, goal_position in goal_state.items():
+        for joint_name, _ in goal_state.items():
             joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-
-            ll_pos, ul_pos = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
-            if ll_pos is not None:
-                goal_position = min(ul_pos, max(ll_pos, goal_position))
 
             ll_vel, ul_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
             velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
@@ -237,7 +234,6 @@ class JointPositionListStop(Goal):
             joint: OneDofJoint = god_map.world.joints[joint_name]
             self.names.append(str(joint_name))
             self.current_positions.append(joint.get_symbol(Derivatives.position))
-            self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
 
         task = self.create_and_add_task('joint goal')
