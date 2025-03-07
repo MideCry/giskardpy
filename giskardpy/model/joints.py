@@ -14,7 +14,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
 from line_profiler import profile
 
-from giskardpy.utils.math import limit
+from giskardpy.utils.math import limit, shortest_angular_distance
 
 
 def urdf_joint_to_class(urdf_joint: up.Joint) -> Union[Type[FixedJoint], Type[RevoluteJoint], Type[PrismaticJoint]]:
@@ -408,7 +408,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         self.free_variables = [self.x_vel, self.y_vel, self.yaw]
 
     def update_transform(self, new_parent_T_child: cas.TransMatrix, alpha: float = 1,
-                         max_translation_correction: float = 0.0025, max_rotation_correction: float = 0.01) -> None:
+                         max_translation_correction: float = 0.0025, max_rotation_correction: float = 0.05) -> None:
         position = new_parent_T_child.to_position()
         roll, pitch, yaw = new_parent_T_child.to_rotation().to_rpy()
         offset_x = limit((god_map.world.state[self.x.name].position*(1-alpha) + position.x.to_np()*alpha) - god_map.world.state[self.x.name].position,
@@ -417,7 +417,14 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         offset_y = limit((god_map.world.state[self.y.name].position*(1-alpha) + position.y.to_np()*alpha) - god_map.world.state[self.y.name].position,
                          -max_translation_correction,
                          max_translation_correction)
-        offset_yaw = limit((god_map.world.state[self.yaw.name].position*(1-alpha) + yaw.to_np()*alpha) - god_map.world.state[self.yaw.name].position,
+
+        # todo, don't touch a running system, future problem
+        # bug was that toya switches from -pi to pi in yaw, but giskard doesn't
+        angle_error_old = shortest_angular_distance(god_map.world.state[self.yaw.name].position, yaw.to_np())
+        actual_in_giskard_units = god_map.world.state[self.yaw.name].position + angle_error_old
+        est = god_map.world.state[self.yaw.name].position*(1-alpha) + actual_in_giskard_units*alpha
+        angle_error = shortest_angular_distance(god_map.world.state[self.yaw.name].position, est)
+        offset_yaw = limit(angle_error,
                            -max_rotation_correction,
                            max_rotation_correction)
         god_map.world.state[self.x.name].position += offset_x
