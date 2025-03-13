@@ -17,7 +17,7 @@ class AlignToPushDoor(Goal):
                  door_object: str,
                  door_handle: str,
                  tip_gripper_axis: cas.Vector3,
-                 goal_angle: float = None,
+                 goal_angle: Optional[float] = None,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: float = 0.1,
@@ -70,7 +70,7 @@ class AlignToPushDoor(Goal):
         if goal_angle is None:
             desired_angle = object_joint_angle * 0.5  # just chose 1/2 of the goal angle
         else:
-            desired_angle = goal_angle * 0.5
+            desired_angle = goal_angle * 0.7
 
         # find point w.r.t rotated door in local frame
         door_R_door_rotated = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,

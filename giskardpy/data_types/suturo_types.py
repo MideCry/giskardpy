@@ -18,6 +18,7 @@ class ForceTorqueThresholds(Enum):
     DOOR = 3
     DISHDOOR = 4
     FT_Tilt = 5  # Pouring (not currently in use)
+    SHELF_GRASP = 6
 
 
 # List of Objects that need to be differentiated between when placing method is used
