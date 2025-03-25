@@ -14,7 +14,6 @@ from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import my_string, PrefixName, Derivatives, derivative_map, ColorRGBA
 import giskardpy.casadi_wrapper as cas
 
-
 class WorldConfig(ABC):
     _world: WorldTree
     _default_limits = {
@@ -215,18 +214,12 @@ class EmptyWorld(WorldConfig):
 
 
 class WorldWithFixedRobot(WorldConfig):
-    def __init__(self,
-                 urdf: str,
-                 map_name: str = 'map'):
+    def __init__(self, joint_limits: Dict[Derivatives, float] = None):
         super().__init__()
-        self.urdf = urdf
-        self.map_name = PrefixName(map_name)
+        self._joint_limits = joint_limits
 
-    def setup(self, robot_name: Optional[str] = None) -> None:
-        self.add_empty_link(self.map_name)
-        self.add_robot_urdf(self.urdf, robot_name)
-        root_link_name = self.get_root_link_of_group(self.robot_group_name)
-        self.add_fixed_joint(parent_link=self.map_name, child_link=root_link_name)
+    def setup(self, robot_description: str, robot_name: str) -> None:
+        self.add_robot_urdf(robot_description, robot_name)
 
 
 class WorldWithOmniDriveRobot(WorldConfig):
