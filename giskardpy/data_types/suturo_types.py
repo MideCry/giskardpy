@@ -10,7 +10,6 @@ class GripperTypes(Enum):
 
 
 # List of Methods that need Thresholds for force_monitor: GraspObjectCarefully(might include Doors?), Placing
-# TODO: Rework Enum Names
 @unique
 class ForceTorqueThresholds(Enum):
     GRASP = 1

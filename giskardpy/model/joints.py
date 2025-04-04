@@ -418,7 +418,6 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
                          -max_translation_correction,
                          max_translation_correction)
 
-        # todo, don't touch a running system, future problem
         # bug was that toya switches from -pi to pi in yaw, but giskard doesn't
         angle_error_old = shortest_angular_distance(god_map.world.state[self.yaw.name].position, yaw.to_np())
         actual_in_giskard_units = god_map.world.state[self.yaw.name].position + angle_error_old

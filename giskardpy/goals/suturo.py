@@ -44,7 +44,6 @@ class ObjectGoal(Goal):
             get_middleware().loginfo('trying to get objects with name')
 
             object_link = god_map.world.get_link(object_name)
-            # TODO: When object has no collision: set size to 0, 0, 0
             object_collisions = object_link.collisions
             if len(object_collisions) == 0:
                 object_geometry = BoxGeometry(link_T_geometry=np.eye(4), depth=0, width=0, height=0, color=None)
@@ -96,7 +95,7 @@ class Reaching(ObjectGoal):
                  object_name: Optional[str] = None,
                  object_shape: Optional[str] = None,
                  goal_pose: Optional[cas.TransMatrix] = None,
-                 object_size: Optional[cas.Vector3] = None,  # change to cas.Vector3
+                 object_size: Optional[cas.Vector3] = None,
                  velocity: float = 0.2,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: w.Expression = w.TrueSymbol,
@@ -159,12 +158,11 @@ class Reaching(ObjectGoal):
             self.reference_frame = 'base_footprint'
             get_middleware().logwarn(f'Warning: Object not in giskard world')
 
-        # TODO: Offsets korrekt berechnen
-        # TODO: Weitere Objekte einfügen
         if self.object_shape == 'sphere' or self.object_shape == 'cylinder':
             self.offsets = cas.Vector3.from_xyz(x=self.object_size.x, y=self.object_size.y, z=self.object_size.z)
 
         # TODO: fine tune and add correct object names
+        # FIXME: add Parameter instead of hard-coded values
         elif self.object_name == 'Plate':
             self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 2) + 0.03, y=self.object_size.y,
                                                 z=self.object_size.z)
@@ -177,7 +175,7 @@ class Reaching(ObjectGoal):
             self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 2) + 0.02, y=self.object_size.y,
                                                 z=self.object_size.z)
 
-        # TODO: Add proper case for Tray (calculate proper offset for final Tray)
+        # TODO: Test Tray on real robot
         elif self.object_name == ObjectTypes.OT_Tray.value:
             self.offsets = cas.Vector3.from_xyz(x=-(self.object_size.x / 3), y=self.object_size.y,
                                                 z=self.object_size.z - 0.05)
@@ -354,7 +352,6 @@ class GraspObject(ObjectGoal):
                                                        hold_condition=hold_condition,
                                                        end_condition=end_condition))
 
-        # FIXME you can use orientation goal instead of two align planes
         # Align vertical
         self.add_constraints_of_goal(AlignPlanes(name='APlanesVertical',
                                                  root_link=self.root_link,
@@ -1212,9 +1209,9 @@ class MoveAroundDishwasher(Goal):
         # axis pointing in the direction of handle frame from door joint frame
         direction_axis = np.argmax(abs(temp_point[0:3]))
 
-        multipliers = [(11 / 10, -0.7, 'down_short'),
-                       (7 / 5, -0.3, 'down_long'),
-                       (7 / 5, 0.4, 'up_long')]
+        multipliers = [#(11 / 10, -0.7, 'down_short'),
+                       (7 / 5, -0.6, 'down_long'),
+                       (15 / 10, 0.5, 'up_long')]
         root_P_top_chain = []
 
         for i, (axis_multi, angle_multi, goal_name) in enumerate(multipliers):
@@ -1400,5 +1397,3 @@ def check_context_element(name: str,
 def multiply_vector(vec: cas.Vector3,
                     number: int):
     return cas.Vector3.from_xyz(vec.x * number, vec.y * number, vec.z * number)
-
-# TODO: Make Cartesian Orientation from two alignplanes

@@ -196,7 +196,6 @@ class JointPositionList(Goal):
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
-# TODO: add Interface (use in Door-opening)
 class JointPositionListStop(Goal):
     def __init__(self,
                  goal_state: Dict[str, float],
