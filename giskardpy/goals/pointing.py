@@ -91,10 +91,13 @@ class PointingCone(Goal):
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Will orient pointing_axis at goal_point.
+        Creates a viewing cone by using the pointing axis and the axis projection.
+        Mainly used in cml for less volatile human tracking.
         :param tip_link: tip link of the kinematic chain.
         :param goal_point: where to point pointing_axis at.
         :param root_link: root link of the kinematic chain.
         :param pointing_axis: the axis of tip_link that will be used for pointing
+        :param cone_theta: cone angle in radians, decides the size of the viewing cone.
         :param max_velocity: rad/s
         :param weight:
         """
