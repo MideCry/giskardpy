@@ -217,7 +217,6 @@ class PlaceThresholdStrategy(ThresholdStrategy):
         # case for placing plates
         # NOT CURRENTLY USED AS PLATES ARE NEITHER PLACED NOR PICKED UP
         elif self.object_type == ObjectTypes.OT_Plate.value:
-            #  TODO: Add proper placing logic for Plate
             force_z_threshold = 1.0
 
             if abs(rob_force[2]) >= force_z_threshold:
