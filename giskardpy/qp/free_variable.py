@@ -187,7 +187,7 @@ class FreeVariable:
 
     @memoize
     @profile
-    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float = 0.1,
+    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
         limit = self.get_upper_limit(derivative)
         if limit is None:

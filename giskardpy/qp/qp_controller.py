@@ -671,9 +671,7 @@ class EqualityBounds(ProblemDataPart):
         for t in range(self.prediction_horizon):
             for c in self.get_eq_derivative_constraints(derivative):
                 if t < self.control_horizon:
-                    bound[f't{t:03}/{c.name}'] = cas.limit(c.bound[t] * self.dt,
-                                                           -c.normalization_factor * self.dt,
-                                                           c.normalization_factor * self.dt)
+                    bound[f't{t:03}/{c.name}'] = c.bound[t] * self.dt
         return bound
 
     @profile
@@ -770,12 +768,8 @@ class InequalityBounds(ProblemDataPart):
         for t in range(self.prediction_horizon):
             for c in self.get_derivative_constraints(derivative):
                 if t < self.control_horizon:
-                    lower[f't{t:03}/{c.name}'] = cas.limit(c.lower_limit[t] * self.dt,
-                                                           -c.normalization_factor * self.dt,
-                                                           c.normalization_factor * self.dt)
-                    upper[f't{t:03}/{c.name}'] = cas.limit(c.upper_limit[t] * self.dt,
-                                                           -c.normalization_factor * self.dt,
-                                                           c.normalization_factor * self.dt)
+                    lower[f't{t:03}/{c.name}'] = c.lower_limit[t] * self.dt
+                    upper[f't{t:03}/{c.name}'] = c.upper_limit[t] * self.dt
         return lower, upper
 
     def lower_inequality_constraint_bound(self):
@@ -1117,10 +1111,10 @@ class EqualityModel(ProblemDataPart):
                         horizontal_offset = J_hstack.shape[1]
                         model[:, horizontal_offset * 0:horizontal_offset * 1] = J_hstack
 
-            # slack variable for total error
-            slack_model = cas.diag(
-                cas.Expression([self.dt * self.control_horizon for c in self.equality_constraints]))
-            return model, slack_model
+                # slack variable for total error
+                slack_model = cas.diag(
+                    cas.Expression([self.dt * self.control_horizon for c in self.equality_constraints]))
+                return model, slack_model
         return cas.Expression(), cas.Expression()
 
     @profile
@@ -1499,7 +1493,6 @@ class InequalityModel(ProblemDataPart):
         # acc_constr_model, acc_constr_slack_model = self.acceleration_constraint_model()
         # jerk_constr_model, jerk_constr_slack_model = self.jerk_constraint_model()
         inequality_model, inequality_slack_model = self.inequality_constraint_model(max_derivative)
-
         model_parts = []
         slack_model_parts = []
         if self.qp_formulation.explicit_pos_limits():

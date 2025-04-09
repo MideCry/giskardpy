@@ -515,8 +515,8 @@ TrinaryFalse = 0
 TrinaryUnknown = 0.5
 TrinaryTrue = 1
 
-BinaryTrue = TrueSymbol = Expression(True)
-BinaryFalse = FalseSymbol = Expression(False)
+BinaryTrue = Expression(True)
+BinaryFalse = Expression(False)
 
 
 class GeometricType:
@@ -1469,6 +1469,10 @@ def ones(x, y):
     return Expression(ca.SX.ones(x, y))
 
 
+def tri(dimension):
+    return Expression(np.tri(dimension))
+
+
 def abs(x):
     x = Expression(x).s
     result = ca.fabs(x)
@@ -1582,10 +1586,23 @@ def logic_and(*args):
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
-def logic_and3(a, b):
-    cas_a = _to_sx(a)
-    cas_b = _to_sx(b)
-    return min(cas_a, cas_b)
+def logic_and3(*args):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any False, return False
+    if [x for x in args if is_false_symbol(x)]:
+        return TrinaryFalse
+    # filter all True
+    args = [x for x in args if not is_true_symbol(x)]
+    if len(args) == 0:
+        return TrinaryTrue
+    if len(args) == 1:
+        return args[0]
+    if len(args) == 2:
+        cas_a = _to_sx(args[0])
+        cas_b = _to_sx(args[1])
+        return min(cas_a, cas_b)
+    else:
+        return logic_and3(args[0], logic_and3(*args[1:]))
 
 
 def logic_any(args):
@@ -1625,7 +1642,7 @@ def logic_not(expr):
 
 
 def logic_not3(expr):
-    return Expression(1-expr)
+    return Expression(1 - expr)
 
 
 def if_greater(a, b, if_result, else_result):
@@ -2068,7 +2085,37 @@ def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
     d = normal.dot(frame_P_current)
     normal.scale(d)
     nearest = frame_P_current - normal
-    return norm(nearest-frame_P_current), nearest
+    return norm(nearest - frame_P_current), nearest
+
+
+def distance_point_to_plane_signed(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    normal = normal / norm(normal)  # Normalize the normal vector
+    d = normal.dot(frame_P_current)  # Signed distance to the plane
+    nearest = frame_P_current - normal * d  # Nearest point on the plane
+    return d, nearest
+
+
+def project_to_cone(frame_V_current, frame_V_cone_axis, cone_theta):
+    frame_V_cone_axis_norm = frame_V_cone_axis / norm(frame_V_cone_axis)
+    beta = dot(frame_V_current, frame_V_cone_axis_norm)
+    norm_v = norm(frame_V_current)
+
+    # Compute the perpendicular component.
+    v_perp = frame_V_current - beta * frame_V_cone_axis_norm
+    norm_v_perp = norm(v_perp)
+
+    s = beta * cos(cone_theta) + norm_v_perp * sin(cone_theta)
+
+    # Handle the case when v is collinear with a.
+    project_on_cone_boundary = if_less(a=norm_v_perp, b=1e-8,
+                                       if_result=norm_v * cos(cone_theta) * frame_V_cone_axis_norm,
+                                       else_result=s * (cos(cone_theta) * frame_V_cone_axis_norm + sin(cone_theta) * (
+                                                   v_perp / norm_v_perp)))
+
+    return if_greater_eq(a=beta, b=norm_v * np.cos(cone_theta),
+                         if_result=frame_V_current,
+                         else_result=project_on_cone_boundary)
 
 
 def project_to_cone(frame_V_current, frame_V_cone_axis, cone_theta):
@@ -2310,7 +2357,9 @@ def substitute(expression, old_symbols, new_symbols):
     old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
     new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
     sx = ca.substitute(sx, old_symbols, new_symbols)
-    return type(expression)(sx)
+    result = copy(expression)
+    result.s = sx
+    return result
 
 
 def matrix_inverse(a):

@@ -383,8 +383,7 @@ TrinaryTrue = 1
 
 BinaryTrue: Expression
 BinaryFalse: Expression
-TrueSymbol: Expression
-FalseSymbol: Expression
+
 
 
 class GeometricType:

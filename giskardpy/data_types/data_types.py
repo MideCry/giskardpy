@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections import defaultdict, deque, OrderedDict
 from copy import deepcopy
-from enum import IntEnum
+from enum import IntEnum, Enum
 from typing import Optional, Generic, TypeVar, Dict, Union
 
 import numpy as np
-
+import giskardpy.casadi_wrapper as cas
 
 class PrefixName:
     primary_separator = '/'
@@ -323,9 +323,15 @@ class BiDict(dict):
         super().__delitem__(key)
 
 
-class TaskState(IntEnum):
+class LifeCycleState(IntEnum):
     not_started = 0
     running = 1
-    on_hold = 2
+    paused = 2
     succeeded = 3
     failed = 4
+
+
+class ObservationState:
+    false = cas.TrinaryFalse
+    unknown = cas.TrinaryUnknown
+    true = cas.TrinaryTrue
