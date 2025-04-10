@@ -32,7 +32,7 @@ class Demo:
         self.gis.motion_goals.add_cartesian_pose(goal_pose=goal,
                                                  root_link='map',
                                                  tip_link='base_footprint',
-                                                 hold_condition='',
+                                                 pause_condition='',
                                                  end_condition=cart_mon)
 
         local_min = self.gis.monitors.add_local_minimum_reached(start_condition=cart_mon)
@@ -57,7 +57,7 @@ class Demo:
         self.gis.motion_goals.add_cartesian_pose(goal_pose=goal2,
                                                  root_link='map',
                                                  tip_link='base_footprint',
-                                                 hold_condition='',
+                                                 pause_condition='',
                                                  end_condition=cart_mon2)
 
         local_min = self.gis.monitors.add_local_minimum_reached(start_condition=cart_mon2)

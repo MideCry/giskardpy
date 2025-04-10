@@ -27,6 +27,26 @@ class Goal(MotionStatechartNode):
         self.monitors = []
         self.goals = []
 
+        self.standard_forward, self.standard_left, self.standard_up = None, None, None
+        self.gripper_forward, self.gripper_left, self.gripper_up = None, None, None
+        self.base_forward, self.base_left, self.base_up = None, None, None
+        self.gripper_tool_frame = None
+
+        if god_map.world.robot_name == 'hsrb':
+            self.standard_forward = cas.Vector3().from_xyz(x=1, y=0, z=0)
+            self.standard_left = cas.Vector3().from_xyz(x=0, y=1, z=0)
+            self.standard_up = cas.Vector3().from_xyz(x=0, y=0, z=1)
+
+            self.gripper_forward = cas.Vector3().from_xyz(x=0, y=0, z=1)
+            self.gripper_left = cas.Vector3().from_xyz(x=0, y=-1, z=0)
+            self.gripper_up = cas.Vector3().from_xyz(x=1, y=0, z=0)
+
+            self.base_forward = cas.Vector3().from_xyz(x=1, y=0, z=0)
+            self.base_left = cas.Vector3().from_xyz(x=0, y=1, z=0)
+            self.base_up = cas.Vector3().from_xyz(x=0, y=0, z=1)
+
+            self.gripper_tool_frame = 'hand_gripper_tool_frame'
+
     def get_observation_state_expression(self):
         return symbol_manager.get_symbol(f'god_map'
                                          f'.motion_statechart_manager'

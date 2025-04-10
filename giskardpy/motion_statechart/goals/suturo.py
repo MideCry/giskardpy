@@ -1,27 +1,27 @@
 import os
 from copy import deepcopy
 from enum import Enum
-from typing import Optional, Dict
+from typing import Optional
 
 import numpy as np
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.data_types.suturo_types import ObjectTypes, TakePoseTypes
-from giskardpy.data_types.data_types import PrefixName
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.suturo_types import GraspTypes
-from giskardpy.goals.align_planes import AlignPlanes
-from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
-from giskardpy.goals.goal import Goal
-from giskardpy.goals.joint_goals import JointPositionList, JointVelocityLimit
-from giskardpy.goals.open_close import Open
+from giskardpy.data_types.suturo_types import ObjectTypes, TakePoseTypes
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.links import BoxGeometry, LinkGeometry, SphereGeometry, CylinderGeometry
-from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, LocalMinimumReached, EndMotion
-from giskardpy.motion_graph.monitors.payload_monitors import Sleep
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPosition, CartesianOrientation
+from giskardpy.motion_statechart.goals.goal import Goal
+from giskardpy.motion_statechart.goals.open_close import Open
+from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_statechart.monitors.monitors import Monitor, LocalMinimumReached, EndMotion
+from giskardpy.motion_statechart.monitors.payload_monitors import Sleep
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointVelocityLimit
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 
 if 'GITHUB_WORKFLOW' not in os.environ:
     pass
@@ -97,10 +97,7 @@ class Reaching(ObjectGoal):
                  goal_pose: Optional[cas.TransMatrix] = None,
                  object_size: Optional[cas.Vector3] = None,
                  velocity: float = 0.2,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
             Concludes Reaching type goals.
             Executes them depending on the given context action.
@@ -122,7 +119,7 @@ class Reaching(ObjectGoal):
         if name is None:
             name = 'Reaching'
 
-        super().__init__(name)
+        super().__init__(name=name)
 
         if root_link is None:
             root_link = god_map.world.groups[god_map.world.robot_name].root_link.name.short_name
@@ -190,18 +187,20 @@ class Reaching(ObjectGoal):
         if all(self.grasp != member.value for member in GraspTypes):
             raise Exception(f"Unknown grasp value: {grasp}")
 
-        self.add_constraints_of_goal(GraspObject(goal_pose=self.goal_pose,
-                                                 reference_frame_alignment=self.reference_frame,
-                                                 offsets=self.offsets,
-                                                 grasp=self.grasp,
-                                                 align=self.align,
-                                                 root_link=self.root_link_name,
-                                                 tip_link=self.tip_link_name,
-                                                 velocity=self.velocity,
-                                                 weight=self.weight,
-                                                 start_condition=start_condition,
-                                                 hold_condition=hold_condition,
-                                                 end_condition=end_condition))
+        go = GraspObject(goal_pose=self.goal_pose,
+                         reference_frame_alignment=self.reference_frame,
+                         offsets=self.offsets,
+                         grasp=self.grasp,
+                         align=self.align,
+                         root_link=self.root_link_name,
+                         tip_link=self.tip_link_name,
+                         velocity=self.velocity,
+                         weight=self.weight,
+                         name='GraspObject Reaching')
+        go.start_condition = self.start_condition
+        go.pause_condition = self.pause_condition
+        go.end_condition = self.end_condition
+        self.add_goal(go)
 
 
 class GraspObject(ObjectGoal):
@@ -215,10 +214,7 @@ class GraspObject(ObjectGoal):
                  root_link: Optional[PrefixName] = None,
                  tip_link: Optional[PrefixName] = None,
                  velocity: float = 0.2,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
             Concludes Reaching type goals.
             Executes them depending on the given context action.
@@ -300,16 +296,16 @@ class GraspObject(ObjectGoal):
             self.goal_point.z -= self.offsets.z
 
         elif self.grasp == GraspTypes.FRONT.value:
-           # v = cas.Vector3.from_xyz(0, 2, 0)
+            # v = cas.Vector3.from_xyz(0, 2, 0)
             self.goal_vertical_axis.x = self.standard_up.x
-            self.goal_vertical_axis.y = self.standard_up.y #v.y
+            self.goal_vertical_axis.y = self.standard_up.y  # v.y
             self.goal_vertical_axis.z = self.standard_up.z
-            self.goal_frontal_axis.x = self.standard_forward.x #self.standard_up.x
-            self.goal_frontal_axis.y = self.standard_forward.y #self.standard_up.y
-            self.goal_frontal_axis.z = self.standard_forward.z #self.standard_up.z
+            self.goal_frontal_axis.x = self.standard_forward.x  # self.standard_up.x
+            self.goal_frontal_axis.y = self.standard_forward.y  # self.standard_up.y
+            self.goal_frontal_axis.z = self.standard_forward.z  # self.standard_up.z
 
             self.goal_point.z -= 0.01
-            #self.goal_point.x += self.offsets.x
+        # self.goal_point.x += self.offsets.x
 
         elif self.grasp == GraspTypes.LEFT.value:
             self.goal_vertical_axis.x = self.standard_up.x
@@ -343,44 +339,48 @@ class GraspObject(ObjectGoal):
         self.tip_frontal_axis.z = self.gripper_forward.z
 
         # Position
-        self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link,
-                                                       tip_link=self.tip_link,
-                                                       goal_point=self.goal_point,
-                                                       reference_velocity=self.velocity,
-                                                       weight=self.weight,
-                                                       start_condition=start_condition,
-                                                       hold_condition=hold_condition,
-                                                       end_condition=end_condition))
+        cp = CartesianPosition(root_link=self.root_link,
+                               tip_link=self.tip_link,
+                               goal_point=self.goal_point,
+                               reference_velocity=self.velocity,
+                               weight=self.weight)
+        cp.start_condition = self.start_condition
+        cp.pause_condition = self.pause_condition
+        cp.end_condition = self.end_condition
+        self.add_task(cp)
 
         # Align vertical
-        self.add_constraints_of_goal(AlignPlanes(name='APlanesVertical',
-                                                 root_link=self.root_link,
-                                                 tip_link=self.tip_link,
-                                                 goal_normal=self.goal_vertical_axis,
-                                                 tip_normal=self.tip_vertical_axis,
-                                                 reference_velocity=self.velocity,
-                                                 weight=self.weight,
-                                                 start_condition=start_condition,
-                                                 hold_condition=hold_condition,
-                                                 end_condition=end_condition))
+        apv = AlignPlanes(name='APlanesVertical',
+                          root_link=self.root_link,
+                          tip_link=self.tip_link,
+                          goal_normal=self.goal_vertical_axis,
+                          tip_normal=self.tip_vertical_axis,
+                          reference_velocity=self.velocity,
+                          weight=self.weight)
+        apv.start_condition = self.start_condition
+        apv.pause_condition = self.pause_condition
+        apv.end_condition = self.end_condition
+        self.add_task(apv)
 
         # Align frontal
-        self.add_constraints_of_goal(AlignPlanes(name='APlanesFrontal',
-                                                 root_link=self.root_link,
-                                                 tip_link=self.tip_link,
-                                                 goal_normal=self.goal_frontal_axis,
-                                                 tip_normal=self.tip_frontal_axis,
-                                                 reference_velocity=self.velocity,
-                                                 weight=self.weight,
-                                                 start_condition=start_condition,
-                                                 hold_condition=hold_condition,
-                                                 end_condition=end_condition))
+        aph = AlignPlanes(name='APlanesFrontal',
+                          root_link=self.root_link,
+                          tip_link=self.tip_link,
+                          goal_normal=self.goal_frontal_axis,
+                          tip_normal=self.tip_frontal_axis,
+                          reference_velocity=self.velocity,
+                          weight=self.weight)
+        aph.start_condition = self.start_condition
+        aph.pause_condition = self.pause_condition
+        aph.end_condition = self.end_condition
+        self.add_task(aph)
 
-        self.add_constraints_of_goal(KeepRotationGoal(tip_link='base_footprint',
-                                                      weight=self.weight,
-                                                      start_condition=start_condition,
-                                                      hold_condition=hold_condition,
-                                                      end_condition=end_condition))
+        kr = KeepRotationGoal(tip_link='base_footprint',
+                              weight=self.weight)
+        kr.start_condition = self.start_condition
+        kr.pause_condition = self.pause_condition
+        kr.end_condition = self.end_condition
+        self.add_constraints_of_goal(kr)
 
 
 class VerticalMotion(ObjectGoal):
@@ -391,10 +391,7 @@ class VerticalMotion(ObjectGoal):
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
                  velocity: float = 0.2,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Move the tip link vertical according to the given context.
 
@@ -409,7 +406,7 @@ class VerticalMotion(ObjectGoal):
         if name is None:
             name = 'VerticalMotion'
 
-        super().__init__(name)
+        super().__init__(name=name)
 
         if root_link is None:
             root_link = 'base_footprint'
@@ -436,11 +433,12 @@ class VerticalMotion(ObjectGoal):
         else:
             get_middleware().logwarn('no direction given')
 
-        self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.tip_link.short_name,
-                                                      weight=self.weight,
-                                                      start_condition=start_condition,
-                                                      hold_condition=hold_condition,
-                                                      end_condition=end_condition))
+        krg = KeepRotationGoal(tip_link=self.tip_link.short_name,
+                               weight=self.weight)
+        krg.start_condition = self.start_condition
+        krg.pause_condition = self.pause_condition
+        krg.end_condition = self.end_condition
+        self.add_constraints_of_goal(krg)
 
         goal_point_tip = god_map.world.transform(self.tip_link, goal_point_base)
         self.goal_point = deepcopy(goal_point_tip)
@@ -460,15 +458,13 @@ class VerticalMotion(ObjectGoal):
         r_P_g = root_T_goal.to_position()
         r_P_c = root_T_tip.to_position()
 
-        task = self.create_and_add_task(task_name='VerticalMotion')
+        task = Task(name='VerticalMotion')
+        self.add_task(task)
 
         task.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.velocity,
                                         weight=self.weight)
-
-        self.connect_monitors_to_all_tasks(start_condition=start_condition, hold_condition=hold_condition,
-                                           end_condition=end_condition)
 
 
 class Retracting(ObjectGoal):
@@ -479,10 +475,7 @@ class Retracting(ObjectGoal):
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
                  velocity: float = 0.2,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Retract the tip link from the current position by the given distance.
         The exact direction is based on the given reference frame.
@@ -499,7 +492,7 @@ class Retracting(ObjectGoal):
         if name is None:
             name = 'Retracting'
 
-        super().__init__(name)
+        super().__init__(name=name)
 
         if reference_frame is None:
             reference_frame = 'base_footprint'
@@ -527,20 +520,26 @@ class Retracting(ObjectGoal):
         self.goal_point = god_map.world.transform(self.tip_link, reference_P_start)
         # self.root_T_tip_start = god_map.world.compute_fk_np(self.root_link, self.tip_link)
         # self.start_tip_T_current_tip = np.eye(4)
-        self.add_constraints_of_goal(KeepRotationGoal(tip_link='base_footprint',
-                                                      weight=self.weight,
-                                                      start_condition=start_condition,
-                                                      hold_condition=hold_condition,
-                                                      end_condition=end_condition))
+
+        krg = KeepRotationGoal(tip_link='base_footprint',
+                               weight=self.weight,
+                               name='Retracting KRG')
+        krg.start_condition = self.start_condition
+        krg.pause_condition = self.pause_condition
+        krg.end_condition = self.end_condition
+        self.add_goal(krg)
 
         if 'base' not in self.tip_link.short_name:
-            self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.tip_link.short_name,
-                                                          weight=self.weight,
-                                                          start_condition=start_condition,
-                                                          hold_condition=hold_condition,
-                                                          end_condition=end_condition))
+            krg2 = KeepRotationGoal(tip_link=self.tip_link.short_name,
+                                    weight=self.weight,
+                                    name='Tip Link KRG')
+            krg2.start_condition = self.start_condition
+            krg2.pause_condition = self.pause_condition
+            krg2.end_condition = self.end_condition
+            self.add_goal(krg2)
 
-        task = self.create_and_add_task('Retracting')
+        task = Task(name='Retracting')
+        self.add_task(task)
 
         # start_tip_T_current_tip = w.TransMatrix(self.get_parameter_as_symbolic_expression('start_tip_T_current_tip'))
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
@@ -560,9 +559,6 @@ class Retracting(ObjectGoal):
                                         reference_velocity=self.velocity,
                                         weight=self.weight)
 
-        self.connect_monitors_to_all_tasks(start_condition=start_condition, hold_condition=hold_condition,
-                                           end_condition=end_condition)
-
 
 class AlignHeight(ObjectGoal):
     goal_pose: cas.TransMatrix
@@ -576,10 +572,7 @@ class AlignHeight(ObjectGoal):
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
                  velocity: float = 0.2,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Align the tip link with the given goal_pose to prepare for further action (e.g. grasping or placing)
 
@@ -596,7 +589,7 @@ class AlignHeight(ObjectGoal):
         if name is None:
             name = 'AlignHeight'
 
-        super().__init__(name)
+        super().__init__(name=name)
 
         self.object_name = object_name
 
@@ -655,42 +648,48 @@ class AlignHeight(ObjectGoal):
             tip_V_x = cas.Vector3().from_xyz(x=1)
             tip_V_x.reference_frame = self.tip_link
 
-            self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link,
-                                                     tip_link=self.tip_link,
-                                                     goal_normal=base_V_g,
-                                                     tip_normal=tip_V_g,
-                                                     name='APlane1'))
+            self.add_task(AlignPlanes(root_link=self.root_link,
+                                      tip_link=self.tip_link,
+                                      goal_normal=base_V_g,
+                                      tip_normal=tip_V_g,
+                                      name='APlane1'))
 
-            self.add_constraints_of_goal(AlignPlanes(root_link=self.root_link,
-                                                     tip_link=self.tip_link,
-                                                     goal_normal=base_V_x,
-                                                     tip_normal=tip_V_x,
-                                                     name='APlane2'))
+            self.add_task(AlignPlanes(root_link=self.root_link,
+                                      tip_link=self.tip_link,
+                                      goal_normal=base_V_x,
+                                      tip_normal=tip_V_x,
+                                      name='APlane2'))
 
         else:
             # Tip facing frontal
-            self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.tip_link,
-                                                          weight=self.weight,
-                                                          start_condition=start_condition,
-                                                          hold_condition=hold_condition,
-                                                          end_condition=end_condition))
+            krg_tip = KeepRotationGoal(tip_link=self.tip_link,
+                                       weight=self.weight,
+                                       name='KRG Tip facing frontal')
+            krg_tip.start_condition = self.start_condition
+            krg_tip.pause_condition = self.pause_condition
+            krg_tip.end_condition = self.end_condition
+            self.add_goal(krg_tip)
 
-        self.add_constraints_of_goal(KeepRotationGoal(tip_link=self.base_footprint,
-                                                      weight=self.weight,
-                                                      start_condition=start_condition,
-                                                      hold_condition=hold_condition,
-                                                      end_condition=end_condition))
+        krg_base = KeepRotationGoal(tip_link=self.base_footprint,
+                                    weight=self.weight,
+                                    name='KRG base_footprint')
+        krg_base.start_condition = self.start_condition
+        krg_base.pause_condition = self.pause_condition
+        krg_base.end_condition = self.end_condition
+        self.add_goal(krg_base)
 
         self.goal_point = god_map.world.transform(self.tip_link, base_goal_point)
 
-        self.add_constraints_of_goal(CartesianPosition(root_link=self.root_link,
-                                                       tip_link=self.tip_link,
-                                                       goal_point=self.goal_point,
-                                                       reference_velocity=self.velocity,
-                                                       weight=self.weight,
-                                                       start_condition=start_condition,
-                                                       hold_condition=hold_condition,
-                                                       end_condition=end_condition))
+        cp = CartesianPosition(root_link=self.root_link,
+                               tip_link=self.tip_link,
+                               goal_point=self.goal_point,
+                               reference_velocity=self.velocity,
+                               weight=self.weight,
+                               name='AlignHeight CartesianPosition')
+        cp.start_condition = self.start_condition
+        cp.pause_condition = self.pause_condition
+        cp.end_condition = self.end_condition
+        self.add_task(cp)
 
 
 class Placing(ObjectGoal):
@@ -703,10 +702,7 @@ class Placing(ObjectGoal):
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
                  velocity: float = 0.02,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
 
         """
         Place an object. Use monitor_placing in python_interface.py in
@@ -741,16 +737,18 @@ class Placing(ObjectGoal):
 
         self.root_link = god_map.world.search_for_link_name(root_link)
         self.tip_link = god_map.world.search_for_link_name(tip_link)
-        self.add_constraints_of_goal(GraspObject(goal_pose=self.goal_pose,
-                                                 align=self.align,
-                                                 grasp=self.grasp,
-                                                 root_link=self.root_link.short_name,
-                                                 tip_link=self.tip_link.short_name,
-                                                 velocity=self.velocity,
-                                                 weight=self.weight,
-                                                 start_condition=start_condition,
-                                                 hold_condition=hold_condition,
-                                                 end_condition=end_condition))
+
+        go = GraspObject(goal_pose=self.goal_pose,
+                         align=self.align,
+                         grasp=self.grasp,
+                         root_link=self.root_link.short_name,
+                         tip_link=self.tip_link.short_name,
+                         velocity=self.velocity,
+                         weight=self.weight)
+        go.start_condition = self.start_condition
+        go.pause_condition = self.pause_condition
+        go.end_condition = self.pause_condition
+        self.add_goal(go)
 
     # might need to be removed in the future, as soon as the old interface isn't in use anymore
 
@@ -765,10 +763,7 @@ class Tilting(Goal):
                  name: str = None,
                  direction: Optional[str] = None,
                  angle: Optional[float] = None,
-                 tip_link: str = 'wrist_roll_joint',
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 tip_link: str = 'wrist_roll_joint'):
         """
         Tilts the given tip link into one direction by a given angle.
 
@@ -780,7 +775,7 @@ class Tilting(Goal):
         """
         if name is None:
             name = 'Tilting'
-        super().__init__(name)
+        super().__init__(name=name)
 
         max_angle = -2.0
 
@@ -797,19 +792,18 @@ class Tilting(Goal):
 
         self.goal_state = {self.tip_link: wrist_state}
 
-        self.add_constraints_of_goal(JointPositionList(goal_state=self.goal_state,
-                                                       start_condition=start_condition,
-                                                       hold_condition=hold_condition,
-                                                       end_condition=end_condition))
+        jpl = JointPositionList(goal_state=self.goal_state,
+                                name='Tilting JointPositionList')
+        jpl.start_condition = self.start_condition
+        jpl.pause_condition = self.pause_condition
+        jpl.end_condition = self.end_condition
+        self.add_task(jpl)
 
 
 class TakePose(Goal):
     def __init__(self,
                  pose_keyword: str,
-                 name: str = None,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 name: str = None):
         """
         Get into a predefined pose with a given keyword.
         Used to get into complete poses. To move only specific joints use 'JointPositionList'
@@ -818,7 +812,7 @@ class TakePose(Goal):
         """
         if name is None:
             name = f'TakePose-{pose_keyword}'
-        super().__init__(name)
+        super().__init__(name=name)
 
         if pose_keyword == TakePoseTypes.PARK.value:
             head_pan_joint = 0.0
@@ -906,20 +900,18 @@ class TakePose(Goal):
             'wrist_roll_joint': wrist_roll_joint}
         self.goal_state = joint_states
 
-        self.add_constraints_of_goal(JointPositionList(goal_state=self.goal_state,
-                                                       start_condition=start_condition,
-                                                       hold_condition=hold_condition,
-                                                       end_condition=end_condition))
+        jpl = JointPositionList(goal_state=self.goal_state, name='TakePoseJPL')
+        jpl.start_condition = self.start_condition
+        jpl.pause_condition = self.pause_condition
+        jpl.end_condition = self.end_condition
+        self.add_task(jpl)
 
 
 class Mixing(Goal):
     def __init__(self,
                  name=None,
                  mixing_time: float = 20,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Simple Mixing motion.
 
@@ -940,7 +932,7 @@ class Mixing(Goal):
                                                                  trajectory_length=mixing_time,
                                                                  target_speed=target_speed,
                                                                  start_condition=start_condition,
-                                                                 hold_condition=hold_condition,
+                                                                 pause_condition=pause_condition,
                                                                  end_condition=end_condition))
 
         self.add_constraints_of_goal(JointRotationGoalContinuous(joint_name='wrist_flex_joint',
@@ -949,7 +941,7 @@ class Mixing(Goal):
                                                                  trajectory_length=mixing_time,
                                                                  target_speed=target_speed,
                                                                  start_condition=start_condition,
-                                                                 hold_condition=hold_condition,
+                                                                 pause_condition=pause_condition,
                                                                  end_condition=end_condition))
 
         self.add_constraints_of_goal(JointRotationGoalContinuous(joint_name='arm_roll_joint',
@@ -958,7 +950,7 @@ class Mixing(Goal):
                                                                  trajectory_length=mixing_time,
                                                                  target_speed=target_speed,
                                                                  start_condition=start_condition,
-                                                                 hold_condition=hold_condition,
+                                                                 pause_condition=pause_condition,
                                                                  end_condition=end_condition))
 
 
@@ -970,10 +962,7 @@ class JointRotationGoalContinuous(Goal):
                  name: str = None,
                  trajectory_length: float = 20,
                  target_speed: float = 1,
-                 period_length: float = 1.0,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 period_length: float = 1.0):
         """
         Rotate a joint continuously around a center. The execution time and speed is variable.
 
@@ -1014,10 +1003,7 @@ class KeepRotationGoal(Goal):
     def __init__(self,
                  tip_link: str,
                  name: str = None,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Use this if a specific link should not rotate during a goal execution. Typically used for the hand.
 
@@ -1027,7 +1013,7 @@ class KeepRotationGoal(Goal):
         if name is None:
             name = 'KeepRotationGoal'
 
-        super().__init__(name)
+        super().__init__(name=name)
 
         self.tip_link = god_map.world.search_for_link_name(tip_link)
         self.weight = weight
@@ -1035,13 +1021,15 @@ class KeepRotationGoal(Goal):
         tip_orientation = cas.RotationMatrix()
         tip_orientation.reference_frame = self.tip_link
 
-        self.add_constraints_of_goal(CartesianOrientation(root_link=PrefixName('map'),
-                                                          tip_link=self.tip_link,
-                                                          goal_orientation=tip_orientation,
-                                                          weight=self.weight,
-                                                          start_condition=start_condition,
-                                                          hold_condition=hold_condition,
-                                                          end_condition=end_condition))
+        co = CartesianOrientation(root_link=PrefixName('map'),
+                                  tip_link=self.tip_link,
+                                  goal_orientation=tip_orientation,
+                                  weight=self.weight,
+                                  name=f'CartesianOrientation of {self.name}')
+        co.start_condition = self.start_condition
+        co.pause_condition = self.pause_condition
+        co.end_condition = self.end_condition
+        self.add_task(co)
 
 
 class OpenDoorGoal(Goal):
@@ -1050,23 +1038,17 @@ class OpenDoorGoal(Goal):
                  door_handle_link: PrefixName,
                  name: str = None,
                  handle_limit: Optional[float] = None,
-                 hinge_limit: Optional[float] = None,
-                 start_condition: w.Expression = w.TrueSymbol,
-                 hold_condition: w.Expression = w.FalseSymbol,
-                 end_condition: w.Expression = w.FalseSymbol):
+                 hinge_limit: Optional[float] = None):
         """
         Use this, if you have grasped a door handle and want to open the door and handle
 
         :param tip_link: end effector that is grasping the handle
         :param door_handle_link: link that is grasped by the tip_link
         :param name: name of the goal
-        :param start_condition: start condition of the door opening sequence
-        :param hold_condition: hold condition of the door opening sequence
-        :param end_condition: end condition of the door opening sequence
         """
         if name is None:
             name = 'OpenDoorGoal'
-        super().__init__(name)
+        super().__init__(name=name)
 
         handle_name = door_handle_link
         handle_frame_id = god_map.world.get_movable_parent_joint(handle_name)
@@ -1092,57 +1074,65 @@ class OpenDoorGoal(Goal):
                                                 name=f'{name}_handle_joint_monitor')
         self.add_monitor(handle_state_monitor)
 
-        sleep_mon = Sleep(seconds=0.5,
-                          start_condition=handle_state_monitor.get_state_expression())
+        sleep_mon = Sleep(seconds=0.5, name='Sleep Monitor')
+        sleep_mon.start_condition = handle_state_monitor
         self.add_monitor(sleep_mon)
 
         hinge_state = {door_hinge_id: limit_hinge}
-
         hinge_state_monitor = JointGoalReached(goal_state=hinge_state,
                                                threshold=0.01,
-                                               name=f'{name}_hinge_joint_monitor',
-                                               start_condition=sleep_mon.get_state_expression())
+                                               name=f'{name}_hinge_joint_monitor')
+        hinge_state_monitor.start_condition = sleep_mon
         self.add_monitor(hinge_state_monitor)
 
-        local_min_mon = LocalMinimumReached(start_condition=sleep_mon.get_state_expression())
+        local_min_mon = LocalMinimumReached(name='LocalMinMonitor')
+        local_min_mon.start_condition = sleep_mon
         self.add_monitor(local_min_mon)
 
-        end_con = w.logic_or(end_condition,
-                             w.logic_and(hinge_state_monitor.get_state_expression(),
-                                         local_min_mon.get_state_expression()))
+        if self.end_condition != 'False':
+            end_con = f'{hinge_state_monitor.name} and {local_min_mon.name} and {self.end_condition}'
+        else:
+            end_con = f'{hinge_state_monitor.name} and {local_min_mon.name}'
 
-        self.add_constraints_of_goal(
-            JointVelocityLimit(joint_names=['wrist_flex_joint', 'wrist_roll_joint'], max_velocity=0.03,
-                               start_condition=handle_state_monitor.get_state_expression()))
+        jvl = JointVelocityLimit(joint_names=["wrist_flex_joint", "wrist_roll_joint"],
+                                 max_velocity=0.03,
+                                 name='Wrist Velocity Limits')
+        jvl.start_condition = handle_state_monitor
+        self.add_task(jvl)
 
-        self.add_constraints_of_goal(Open(tip_link=tip_link,
-                                          environment_link=handle_name,
-                                          goal_joint_state=limit_handle,
-                                          name='OpenHandle',
-                                          start_condition=start_condition,
-                                          hold_condition=hold_condition,
-                                          end_condition=end_con))
+        open_goal = Open(tip_link=tip_link,
+                         environment_link=handle_name,
+                         goal_joint_state=limit_handle,
+                         name='OpenHandle')
+        open_goal.start_condition = self.start_condition
+        open_goal.pause_condition = self.pause_condition
+        open_goal.end_condition = end_con
+        self.add_goal(open_goal)
 
-        self.add_constraints_of_goal(JointPositionList(goal_state={door_hinge_id: max_limit_hinge},
-                                                       start_condition=start_condition,
-                                                       hold_condition=hold_condition,
-                                                       end_condition=handle_state_monitor.get_state_expression(),
-                                                       weight=WEIGHT_ABOVE_CA))
+        jpl = JointPositionList(goal_state={door_hinge_id: max_limit_hinge},
+                                weight=WEIGHT_ABOVE_CA,
+                                name='DoorHinge')
+        jpl.start_condition = self.start_condition
+        jpl.pause_condition = self.pause_condition
+        jpl.end_condition = handle_state_monitor
+        self.add_task(jpl)
 
-        self.add_constraints_of_goal(Open(tip_link=tip_link,
-                                          environment_link=link_id,
-                                          goal_joint_state=limit_hinge,
-                                          name='OpenHinge',
-                                          start_condition=sleep_mon.get_state_expression(),
-                                          hold_condition=hold_condition,
-                                          end_condition=end_con))
+        open_goal2 = Open(tip_link=tip_link,
+                          environment_link=link_id,
+                          goal_joint_state=limit_hinge,
+                          name='OpenHinge')
+        open_goal2.start_condition = sleep_mon
+        open_goal2.pause_condition = self.pause_condition
+        open_goal2.end_condition = end_con
+        self.add_goal(open_goal2)
 
-        end_motion = EndMotion(start_condition=end_con)
+        end_motion = EndMotion(name='End Motion Monitor')
+        end_motion.start_condition = end_con
         self.add_monitor(end_motion)
 
 
 class MoveAroundDishwasher(Goal):
-    old_position_monitor: ExpressionMonitor = None
+    old_position_monitor: Monitor = None
     tip_gripper_axis: cas.Vector3 = None
     root_V_tip_grasp_axis: cas.Vector3 = None
     root_V_object_rotation_axis: cas.Vector3 = None
@@ -1156,10 +1146,7 @@ class MoveAroundDishwasher(Goal):
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  goal_angle: float = None,
-                 name: str = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: str = None):
         """
         Adds two Points to move around the door of the dishwasher
 
@@ -1170,12 +1157,12 @@ class MoveAroundDishwasher(Goal):
         :param weight:
         :param name: Name of the goal
         :param start_condition: start condition of the task chain
-        :param hold_condition: hold condition of all task
+        :param pause_condition: hold condition of all task
         :param end_condition: end condition of the task chain
         """
         if name is None:
             name = 'MoveAroundDishwasherGoal'
-        super().__init__(name)
+        super().__init__(name=name)
 
         self.weight = weight
         self.reference_linear_velocity = reference_linear_velocity
@@ -1209,9 +1196,9 @@ class MoveAroundDishwasher(Goal):
         # axis pointing in the direction of handle frame from door joint frame
         direction_axis = np.argmax(abs(temp_point[0:3]))
 
-        multipliers = [#(11 / 10, -0.7, 'down_short'),
-                       (7 / 5, -0.6, 'down_long'),
-                       (15 / 10, 0.5, 'up_long')]
+        multipliers = [  # (11 / 10, -0.7, 'down_short'),
+            (7 / 5, -0.6, 'down_long'),
+            (15 / 10, 0.5, 'up_long')]
         root_P_top_chain = []
 
         for i, (axis_multi, angle_multi, goal_name) in enumerate(multipliers):
@@ -1245,11 +1232,9 @@ class MoveAroundDishwasher(Goal):
             task = self.create_and_add_task(goal_name)
 
             if self.old_position_monitor is None:
-                position_monitor = ExpressionMonitor(name=goal_name,
-                                                     start_condition=w.TrueSymbol)
+                position_monitor = Monitor(name=goal_name)
             else:
-                position_monitor = ExpressionMonitor(name=goal_name,
-                                                     start_condition=self.old_position_monitor.get_state_expression())
+                position_monitor = Monitor(name=goal_name)
 
             distance_to_point = cas.euclidean_distance(root_P_tip, root_P_top)
             point_reached = cas.less(distance_to_point, 0.01)
@@ -1268,18 +1253,18 @@ class MoveAroundDishwasher(Goal):
                                                  reference_velocity=self.reference_angular_velocity,
                                                  weight=self.weight)
 
-            task.hold_condition = hold_condition
+            task.pause_condition = pause_condition
 
             if i == 0:
                 task.start_condition = start_condition
-                task.end_condition = position_monitor.get_state_expression()
+                task.end_condition = position_monitor.get_observation_state_expression()
             elif i == len(root_P_top_chain) - 1:
-                end_con = cas.logic_and(end_condition, position_monitor.get_state_expression())
-                task.start_condition = self.old_position_monitor.get_state_expression()
+                end_con = cas.logic_and(end_condition, position_monitor.get_observation_state_expression())
+                task.start_condition = self.old_position_monitor.get_observation_state_expression()
                 task.end_condition = end_con
             else:
-                task.start_condition = self.old_position_monitor.get_state_expression()
-                task.end_condition = position_monitor.get_state_expression()
+                task.start_condition = self.old_position_monitor.get_observation_state_expression()
+                task.end_condition = position_monitor.get_observation_state_expression()
 
             self.old_position_monitor = position_monitor
 
@@ -1303,11 +1288,7 @@ class GraspBarOffset(Goal):
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
-                 ):
+                 name: Optional[str] = None):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -1329,7 +1310,7 @@ class GraspBarOffset(Goal):
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        super().__init__(name)
+        super().__init__(name=name)
 
         bar_center = god_map.world.transform(self.root, bar_center)
         grasp_axis_offset = god_map.world.transform(self.root, grasp_axis_offset)
@@ -1358,7 +1339,8 @@ class GraspBarOffset(Goal):
 
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        task = self.create_and_add_task('grasp bar')
+        task = Task(name='grasp bar')
+        self.add_task(task)
 
         task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_bar_axis,
@@ -1378,7 +1360,7 @@ class GraspBarOffset(Goal):
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        # self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
         god_map.debug_expression_manager.add_debug_expression('nearest', nearest)
         god_map.debug_expression_manager.add_debug_expression('tip V tip grasp axis', tip_V_tip_grasp_axis)

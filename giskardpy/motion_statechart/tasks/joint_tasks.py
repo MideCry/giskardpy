@@ -6,7 +6,7 @@ from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint, JustinTorso
 from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.utils.math import find_best_jerk_limit
 
@@ -258,6 +258,59 @@ class JointPositionLimitList(Task):
                                            task_expression=current)
 
 
+class JointPositionListStop(Task):
+    def __init__(self,
+                 goal_state: Dict[str, float],
+                 group_name: Optional[str] = None,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 max_velocity: float = 1,
+                 name: Optional[str] = None):
+        """
+        Calls JointPosition for a list of joints.
+        :param goal_state: maps joint_name to goal position
+        :param group_name: if joint_name is not unique, search in this group for matches.
+        :param weight:
+        """
+        self.current_positions = []
+        self.goal_positions = []
+        self.velocity_limits = []
+        self.names = []
+        self.joint_names = list(sorted(goal_state.keys()))
+        if name is None:
+            name = f'{self.__class__.__name__} {self.joint_names}'
+        super().__init__(name=name)
+        self.max_velocity = max_velocity
+        self.weight = weight
+        if len(goal_state) == 0:
+            raise GoalInitalizationException(f'Can\'t initialize {self} with no joints.')
+        for joint_name, _ in goal_state.items():
+            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
+
+            ll_vel, ul_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
+            velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
+
+            joint: OneDofJoint = god_map.world.joints[joint_name]
+            self.names.append(str(joint_name))
+            self.current_positions.append(joint.get_symbol(Derivatives.position))
+            self.velocity_limits.append(velocity_limit)
+
+        for name, current, velocity_limit in zip(self.names, self.current_positions, self.velocity_limits):
+
+            goal = god_map.world.state[name].position
+
+            if god_map.world.is_joint_continuous(name):
+                error = cas.shortest_angular_distance(current, goal)
+            else:
+                error = goal - current
+
+            self.add_equality_constraint(name=name,
+                                         reference_velocity=velocity_limit,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current)
+            god_map.debug_expression_manager.add_debug_expression(name, goal)
+
+
 class JustinTorsoLimit(Task):
     def __init__(self,
                  joint_name: PrefixName,
@@ -306,7 +359,7 @@ class JointVelocityLimit(Task):
                  name: Optional[str] = None):
         """
         Limits the joint velocity of a revolute joint.
-        :param joint_name:
+        :param joint_names:
         :param group_name: if joint_name is not unique, will search in this group for matches.
         :param weight:
         :param max_velocity: rad/s

@@ -7,7 +7,8 @@ from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
+from giskardpy.data_types.data_types import ObservationState
+from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.middleware import get_middleware
 
 
@@ -19,13 +20,10 @@ class LidarPayloadMonitor(PayloadMonitor):
                  frame_id: Optional[str] = 'base_range_sensor_link',
                  laser_distance_threshold_width: Optional[float] = 0.8,
                  laser_distance_threshold: Optional[float] = 0.5,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         super().__init__(name=name,
-                         start_condition=start_condition,
-                         hold_condition=hold_condition,
-                         end_condition=end_condition,
                          run_call_in_thread=False)
         self.topic = topic
         self.laser_scan_analyzer = LaserScanThreshold(laser_frame=frame_id,
@@ -238,7 +236,7 @@ class LaserScanThreshold:
             closest_laser_reading = 0
         return closest_laser_reading, closest_laser_left, closest_laser_right
 
-    def check_collision(self):
+    def check_collision(self) -> ObservationState:
         """
         Checks if Collision is detected
         :return: True if collision detected, False otherwise
@@ -247,6 +245,6 @@ class LaserScanThreshold:
         if (self.laser_distance_threshold_width > self.closest_laser_left
                 or self.laser_distance_threshold_width < self.closest_laser_right
                 or self.closest_laser_reading != 0):
-            return True
+            return ObservationState.true
         else:
-            return False
+            return ObservationState.false

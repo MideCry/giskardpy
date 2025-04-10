@@ -14,7 +14,7 @@ from geometry_msgs.msg import WrenchStamped
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
+from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.data_types.suturo_types import ForceTorqueThresholds, ObjectTypes
 
 
@@ -27,9 +27,6 @@ class PayloadForceTorque(PayloadMonitor):
                  # (not needed for door, just pass an empty string)
                  object_type: Optional[str] = None,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol,
                  stay_true: bool = True):
         """
         The PayloadForceTorque class creates a monitor for the usage of the HSRs Force-Torque Sensor.
@@ -41,12 +38,11 @@ class PayloadForceTorque(PayloadMonitor):
         :param topic: the name of the topic
         :param name: name of the monitor class
         :param start_condition: the start condition of the monitor
-        :param hold_condition: the hold condition of the monitor
+        :param pause_condition: the hold condition of the monitor
         :param end_condition: the end condition of the monitor
         """
 
-        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
-                         end_condition=end_condition, run_call_in_thread=False)
+        super().__init__(name=name, run_call_in_thread=False)
         self.object_type = object_type
         self.threshold_enum = threshold_enum
         self.topic = topic
@@ -56,7 +52,6 @@ class PayloadForceTorque(PayloadMonitor):
         self.sensor_frame = god_map.world.search_for_link_name(wait_for_message(topic, WrenchStamped).header.frame_id)
         self.subscriber = rospy.Subscriber(name=topic,
                                            data_class=WrenchStamped, callback=self.cb)
-
 
     def cb(self, data: WrenchStamped):
         self.rob_force, self.rob_torque = self.force_T_base_transform(data)
