@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import abc
 from abc import ABC
 from collections import defaultdict
 from functools import wraps
 from time import time
-from typing import Tuple, List, Optional, Union, Dict
-import scipy.sparse as sp
+from typing import Tuple, List, Optional, Union, Dict, TYPE_CHECKING
+
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
@@ -12,9 +14,11 @@ from giskardpy.data_types.exceptions import HardConstraintsViolatedException, In
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import memoize
-
 from giskardpy.utils.utils import is_running_in_pytest
 from line_profiler import profile
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 
 
 def record_solver_call_time(function):
@@ -70,6 +74,12 @@ class QPSolver(ABC):
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
         pass
+
+    def update_settings(self, retries_with_relaxed_constraints: float, retry_added_slack: float,
+                        retry_weight_factor: float):
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.retry_added_slack = retry_added_slack
+        self.retry_weight_factor = retry_weight_factor
 
     def set_density(self, weights: cas.Expression, E: cas.Expression, E_slack: cas.Expression, A: cas.Expression,
                     A_slack: cas.Expression):
@@ -181,6 +191,7 @@ class QPSolver(ABC):
 
     @memoize
     def _cached_eyes(self, dimensions: int, nAi_Ai: bool = False) -> Union[np.ndarray, sp.csc_matrix]:
+        from scipy import sparse as sp
         if self.sparse:
             if nAi_Ai:
                 d2 = dimensions * 2
