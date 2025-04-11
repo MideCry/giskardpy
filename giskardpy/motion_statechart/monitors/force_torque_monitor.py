@@ -4,6 +4,7 @@ from typing import Optional
 
 from rospy import wait_for_message
 
+from giskardpy.data_types.data_types import ObservationState
 from giskardpy.middleware import get_middleware
 from giskardpy.symbol_manager import symbol_manager
 
@@ -37,12 +38,11 @@ class PayloadForceTorque(PayloadMonitor):
         :param object_type: is used to determine the type of object that is being placed, is left empty if no object is being placed
         :param topic: the name of the topic
         :param name: name of the monitor class
-        :param start_condition: the start condition of the monitor
-        :param pause_condition: the hold condition of the monitor
-        :param end_condition: the end condition of the monitor
         """
 
         super().__init__(name=name, run_call_in_thread=False)
+        self.rob_torque = None
+        self.rob_force = None
         self.object_type = object_type
         self.threshold_enum = threshold_enum
         self.topic = topic
@@ -86,13 +86,13 @@ class PayloadForceTorque(PayloadMonitor):
         rob_torque = copy(self.rob_torque)
         # if self.state is necessary here because otherwise the monitor will return false
         # in next iteration after already having returned True thus always cancelling the current goal
-        if self.state:
+        if self.state == ObservationState.true:
             return
 
         if self.strategy.check_thresholds(rob_force, rob_torque):
-            self.state = True
+            self.state = ObservationState.true
         else:
-            self.state = False
+            self.state = ObservationState.false
 
 
 class ThresholdStrategy:

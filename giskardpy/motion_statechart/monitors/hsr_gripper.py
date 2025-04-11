@@ -19,11 +19,9 @@ if 'GITHUB_WORKFLOW' not in os.environ:
 
         def __init__(self, *,
                      name: Optional[str] = None,
-                     force: float,
-                     start_condition: cas.Expression = cas.BinaryTrue):
+                     force: float):
             super().__init__(run_call_in_thread=True,
-                             name=name,
-                             start_condition=start_condition)
+                             name=name)
             self.force = force
 
         def __call__(self):
@@ -32,20 +30,17 @@ if 'GITHUB_WORKFLOW' not in os.environ:
             self.action_server.send_goal_and_wait(goal)
             self.state = ObservationState.true
 
+        def get_state(self) -> ObservationState:
+            return self.state
+
 
     class OpenHsrGripper(MoveHSRGripper):
         def __init__(self, *,
-                     name: Optional[str] = None,
-                     start_condition: cas.Expression = cas.BinaryTrue,
-                     pause_condition: cas.Expression = cas.BinaryFalse,
-                     end_condition: cas.Expression = cas.BinaryFalse):
-            super().__init__(name=name, force=0.8, start_condition=start_condition)
+                     name: Optional[str] = None):
+            super().__init__(name=name, force=0.8)
 
 
     class CloseHsrGripper(MoveHSRGripper):
         def __init__(self, *,
-                     name: Optional[str] = None,
-                     start_condition: cas.Expression = cas.BinaryTrue,
-                     pause_condition: cas.Expression = cas.BinaryFalse,
-                     end_condition: cas.Expression = cas.BinaryFalse):
-            super().__init__(name=name, force=-0.8, start_condition=start_condition)
+                     name: Optional[str] = None):
+            super().__init__(name=name, force=-0.8)

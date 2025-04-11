@@ -1026,9 +1026,6 @@ class KeepRotationGoal(Goal):
                                   goal_orientation=tip_orientation,
                                   weight=self.weight,
                                   name=f'CartesianOrientation of {self.name}')
-        co.start_condition = self.start_condition
-        co.pause_condition = self.pause_condition
-        co.end_condition = self.end_condition
         self.add_task(co)
 
 
@@ -1089,10 +1086,7 @@ class OpenDoorGoal(Goal):
         local_min_mon.start_condition = sleep_mon
         self.add_monitor(local_min_mon)
 
-        if self.end_condition != 'False':
-            end_con = f'{hinge_state_monitor.name} and {local_min_mon.name} and {self.end_condition}'
-        else:
-            end_con = f'{hinge_state_monitor.name} and {local_min_mon.name}'
+        end_con = f'{hinge_state_monitor.name} and {local_min_mon.name} or ({self.end_condition})'
 
         jvl = JointVelocityLimit(joint_names=["wrist_flex_joint", "wrist_roll_joint"],
                                  max_velocity=0.03,
@@ -1104,16 +1098,12 @@ class OpenDoorGoal(Goal):
                          environment_link=handle_name,
                          goal_joint_state=limit_handle,
                          name='OpenHandle')
-        open_goal.start_condition = self.start_condition
-        open_goal.pause_condition = self.pause_condition
         open_goal.end_condition = end_con
         self.add_goal(open_goal)
 
         jpl = JointPositionList(goal_state={door_hinge_id: max_limit_hinge},
                                 weight=WEIGHT_ABOVE_CA,
                                 name='DoorHinge')
-        jpl.start_condition = self.start_condition
-        jpl.pause_condition = self.pause_condition
         jpl.end_condition = handle_state_monitor
         self.add_task(jpl)
 
@@ -1122,7 +1112,6 @@ class OpenDoorGoal(Goal):
                           goal_joint_state=limit_hinge,
                           name='OpenHinge')
         open_goal2.start_condition = sleep_mon
-        open_goal2.pause_condition = self.pause_condition
         open_goal2.end_condition = end_con
         self.add_goal(open_goal2)
 
@@ -1156,9 +1145,6 @@ class MoveAroundDishwasher(Goal):
         :param reference_linear_velocity: m/s
         :param weight:
         :param name: Name of the goal
-        :param start_condition: start condition of the task chain
-        :param pause_condition: hold condition of all task
-        :param end_condition: end condition of the task chain
         """
         if name is None:
             name = 'MoveAroundDishwasherGoal'
@@ -1229,16 +1215,18 @@ class MoveAroundDishwasher(Goal):
             god_map.debug_expression_manager.add_debug_expression(f'goal_point_{goal_name}', root_P_top,
                                                                   color=ColorRGBA(0, 0.5, 0.5, 1))
 
-            task = self.create_and_add_task(goal_name)
+            task = Task(name=goal_name)
+            self.add_task(task)
 
             if self.old_position_monitor is None:
-                position_monitor = Monitor(name=goal_name)
+                position_monitor = Monitor(name=f'{goal_name}_pos_monitor')
             else:
-                position_monitor = Monitor(name=goal_name)
+                position_monitor = Monitor(name=f'{goal_name}_pos_monitor')
+                position_monitor.start_condition = self.old_position_monitor
 
             distance_to_point = cas.euclidean_distance(root_P_tip, root_P_top)
             point_reached = cas.less(distance_to_point, 0.01)
-            position_monitor.expression = point_reached
+            position_monitor.observation_expression = point_reached
             self.add_monitor(position_monitor)
 
             task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
@@ -1253,20 +1241,20 @@ class MoveAroundDishwasher(Goal):
                                                  reference_velocity=self.reference_angular_velocity,
                                                  weight=self.weight)
 
-            task.pause_condition = pause_condition
-
             if i == 0:
-                task.start_condition = start_condition
-                task.end_condition = position_monitor.get_observation_state_expression()
+                task.start_condition = self.start_condition
+                task.end_condition = position_monitor.name
             elif i == len(root_P_top_chain) - 1:
-                end_con = cas.logic_and(end_condition, position_monitor.get_observation_state_expression())
-                task.start_condition = self.old_position_monitor.get_observation_state_expression()
+                end_con = f'({self.end_condition}) or {position_monitor.name}'
+                task.start_condition = self.old_position_monitor.name
                 task.end_condition = end_con
             else:
-                task.start_condition = self.old_position_monitor.get_observation_state_expression()
-                task.end_condition = position_monitor.get_observation_state_expression()
+                task.start_condition = self.old_position_monitor.name
+                task.end_condition = position_monitor.name
 
             self.old_position_monitor = position_monitor
+
+        self.observation_expression = self.old_position_monitor.observation_expression
 
 
 class GraspBarOffset(Goal):
