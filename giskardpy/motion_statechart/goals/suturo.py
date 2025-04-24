@@ -1327,7 +1327,7 @@ class GraspBarOffset(Goal):
 
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        task = Task(name='grasp bar')
+        task = Task(name=f'{name}_task')
         self.add_task(task)
 
         task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
