@@ -71,9 +71,15 @@ jobs:
           path: 'giskardpy'
       - name: move pr2.urdf to temp folder from root folder
         run: mv /root/pr2.urdf /__w/giskardpy/giskardpy/giskardpy/test/urdfs/pr2.urdf
+#      - name: Setup upterm session
+#        if: ${{ matrix.tests == 'test_symbol_manager' && matrix.ubuntu_version == '20.04' }}
+#        uses: lhotari/action-upterm@v1
       - name: test
         run: |
           cd giskardpy/test
+          # test_symbol_manager caused error "terminate called without an active exception" on ubuntu:20.04 
+          # adding -v fixes this. The error only occured on first run in github action and is not reproducable locally
+          # could alternativly be fixed by running some empty test beforehand
           python3 -m pytest -v -s ${{ matrix.tests }}.py
   #    - name: Setup upterm session
   ##      if: always()

@@ -8,4 +8,5 @@ def preload_matplotlib():
     from pkg_resources import resource_filename
 
 # Start preloading in the background
-threading.Thread(target=preload_matplotlib, daemon=True).start()
+# threading.Thread(target=preload_matplotlib, daemon=True).start()
+preload_matplotlib()
