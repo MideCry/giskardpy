@@ -74,7 +74,7 @@ jobs:
       - name: test
         run: |
           cd giskardpy/test
-          python3 -m pytest -s ${{ matrix.tests }}.py
+          python3 -m pytest -v -s ${{ matrix.tests }}.py
   #    - name: Setup upterm session
   ##      if: always()
   #      if: failure()
