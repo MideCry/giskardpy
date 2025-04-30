@@ -18,13 +18,11 @@ class PrePushDoor(Goal):
                  door_handle: str,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
+                 threshold: float = 0.01,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_BELOW_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         """
             The objective is to push the object until desired rotation is reached
         """
@@ -70,6 +68,9 @@ class PrePushDoor(Goal):
         push_door_task = Task(name='pre push door')
         self.add_task(push_door_task)
         push_door_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
-                                                  frame_P_goal=cas.Point3(root_P_nearest_in_rotated_door),
+                                                  frame_P_goal=root_P_nearest_in_rotated_door,
                                                   reference_velocity=self.reference_linear_velocity,
                                                   weight=self.weight)
+
+        dist = cas.euclidean_distance(root_T_tip.to_position(), root_P_nearest_in_rotated_door)
+        self.observation_expression = cas.less_equal(dist, threshold)

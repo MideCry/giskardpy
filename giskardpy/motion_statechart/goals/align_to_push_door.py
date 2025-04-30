@@ -1,11 +1,11 @@
 from typing import Optional
+
 import numpy as np
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA
-from giskardpy.data_types.exceptions import GoalInitalizationException
-from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
 
 
@@ -20,6 +20,8 @@ class AlignToPushDoor(Goal):
                  goal_angle: Optional[float] = None,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
+                 distance_threshold: float = 0.01,
+                 angle_threshold: float = 0.01,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  intermediate_point_scale: float = 1,
@@ -58,7 +60,7 @@ class AlignToPushDoor(Goal):
         door_P_intermediate_point = np.zeros(3)
         # axis pointing in the direction of handle frame from door joint frame
         direction_axis = np.argmax(abs(temp_point))
-        door_P_intermediate_point[direction_axis] = temp_point[direction_axis]*intermediate_point_scale
+        door_P_intermediate_point[direction_axis] = temp_point[direction_axis] * intermediate_point_scale
         door_P_intermediate_point = cas.Point3([door_P_intermediate_point[0],
                                                 door_P_intermediate_point[1],
                                                 door_P_intermediate_point[2]])
@@ -95,3 +97,10 @@ class AlignToPushDoor(Goal):
                                                        frame_V_goal=root_V_object_rotation_axis,
                                                        reference_velocity=self.reference_angular_velocity,
                                                        weight=self.weight)
+
+        dist = cas.euclidean_distance(root_T_tip.to_position(), root_P_top)
+        angle = cas.angle_between_vector(root_V_tip_grasp_axis, root_V_object_rotation_axis)
+        self.observation_expression = cas.logic_and(
+            cas.less_equal(dist, distance_threshold),
+            cas.less_equal(angle, angle_threshold)
+        )
