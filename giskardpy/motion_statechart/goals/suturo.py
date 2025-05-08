@@ -8,7 +8,8 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy import casadi_wrapper as w, casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.data_types.suturo_types import GraspTypes
+from giskardpy.data_types.exceptions import ObjectForceTorqueThresholdException
+from giskardpy.data_types.suturo_types import GraspTypes, ForceTorqueThresholds
 from giskardpy.data_types.suturo_types import ObjectTypes, TakePoseTypes
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
@@ -16,11 +17,12 @@ from giskardpy.model.links import BoxGeometry, LinkGeometry, SphereGeometry, Cyl
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.goals.open_close import Open
+from giskardpy.motion_statechart.monitors.force_torque_monitor import PayloadForceTorque
 from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_statechart.monitors.monitors import Monitor, LocalMinimumReached, EndMotion
+from giskardpy.motion_statechart.monitors.monitors import Monitor, CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import Sleep
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointVelocityLimit
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointVelocityLimit, JointPositionListStop
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 
 if 'GITHUB_WORKFLOW' not in os.environ:
@@ -475,6 +477,7 @@ class Retracting(ObjectGoal):
                  root_link: Optional[str] = None,
                  tip_link: Optional[str] = None,
                  velocity: float = 0.2,
+                 threshold: float = 0.01,
                  weight: float = WEIGHT_ABOVE_CA):
         """
         Retract the tip link from the current position by the given distance.
@@ -558,6 +561,9 @@ class Retracting(ObjectGoal):
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.velocity,
                                         weight=self.weight)
+
+        distance = cas.euclidean_distance(r_P_g, r_P_c)
+        self.observation_expression = cas.less_equal(distance, threshold)
 
 
 class AlignHeight(ObjectGoal):
@@ -930,28 +936,19 @@ class Mixing(Goal):
                                                                  joint_center=0.0,
                                                                  joint_range=0.9,
                                                                  trajectory_length=mixing_time,
-                                                                 target_speed=target_speed,
-                                                                 start_condition=start_condition,
-                                                                 pause_condition=pause_condition,
-                                                                 end_condition=end_condition))
+                                                                 target_speed=target_speed))
 
         self.add_constraints_of_goal(JointRotationGoalContinuous(joint_name='wrist_flex_joint',
                                                                  joint_center=-1.3,
                                                                  joint_range=0.2,
                                                                  trajectory_length=mixing_time,
-                                                                 target_speed=target_speed,
-                                                                 start_condition=start_condition,
-                                                                 pause_condition=pause_condition,
-                                                                 end_condition=end_condition))
+                                                                 target_speed=target_speed))
 
         self.add_constraints_of_goal(JointRotationGoalContinuous(joint_name='arm_roll_joint',
                                                                  joint_center=0.0,
                                                                  joint_range=0.1,
                                                                  trajectory_length=mixing_time,
-                                                                 target_speed=target_speed,
-                                                                 start_condition=start_condition,
-                                                                 pause_condition=pause_condition,
-                                                                 end_condition=end_condition))
+                                                                 target_speed=target_speed))
 
 
 class JointRotationGoalContinuous(Goal):
@@ -1029,6 +1026,120 @@ class KeepRotationGoal(Goal):
         self.add_task(co)
 
 
+class GraspWithForceTorqueGoal(Goal):
+    def __init__(self,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
+                 handle_name: PrefixName,
+                 tip_grasp_axis: cas.Vector3,
+                 bar_axis: cas.Vector3,
+                 tip_retract: cas.Point3,
+                 handle_align_axis: cas.Vector3,
+                 tip_align_axis: cas.Vector3,
+                 grasp_axis_offset: cas.Vector3,
+                 pre_grasp_axis_offset: cas.Vector3,
+                 hinge_joint: PrefixName,
+                 bar_length: float = 0.01,
+                 timeout: float = 10,
+                 ft_topic: str = '/filtered_raw/diff',
+                 ft_grasp_ref_speed: float = 1,
+                 name: str = None):
+        """
+        Complex grasping motion using the ForceTorqueMonitor.
+
+        :param root_link: root-link of the kinematic chain.
+        :param tip_link: tip-link of the kinematic chain.
+        :param handle_name: LinkName of the environment-link that is to be grasped.
+        :param tip_grasp_axis: axis of tip-link that is to be aligned with bar axis.
+        :param bar_axis: axis of the handle along which the handlebar is.
+        :param tip_retract: distance the tip will retract after force-torque-threshold is reached.
+        :param handle_align_axis: axis of the handle which will be aligned with the grasp_axis while grasping.
+        :param tip_align_axis: axis of the tip_link along which is grasped. e.g. z-axis of the hsrb-gripper.
+        :param grasp_axis_offset: offset for grasping, such that force-torque sensor can be triggered.
+        :param pre_grasp_axis_offset: offset for pre-grasp-pose, from which the ft-grasping is started.
+        :param hinge_joint: hinge joint to be locked in place while grasping.
+        :param bar_length: length of the handlebar.
+        :param timeout: duration after which the ft-grasping is cancelled.
+        :param ft_topic: topic of the sensor-data for the ft-monitor.
+        :param ft_grasp_ref_speed: reference-speed-modifier for the ft-grasping motion.
+        :param name: Name of the Goal
+        """
+        if name is None:
+            name = 'GraspWithForceTorqueGoal'
+        super().__init__(name=name)
+
+        bar_center = cas.Point3()
+        bar_center.reference_frame = handle_name
+
+        self.reference_linear_velocity = 0.1 * ft_grasp_ref_speed
+        self.reference_angular_velocity = 0.5 * ft_grasp_ref_speed
+
+        door_hinge_lock = {hinge_joint.short_name: 0}
+        jpl_hinge_lock = JointPositionList(goal_state=door_hinge_lock,
+                                           name='Lock Hinge while grasp')
+        jpl_hinge_lock.start_condition = self.start_condition
+        self.add_task(jpl_hinge_lock)
+
+        pre_grasp = GraspBarOffset(name='pre grasp',
+                                   root_link=root_link,
+                                   tip_link=tip_link,
+                                   tip_grasp_axis=tip_grasp_axis,
+                                   bar_center=bar_center,
+                                   bar_axis=bar_axis,
+                                   bar_length=bar_length,
+                                   grasp_axis_offset=grasp_axis_offset)
+        pre_grasp.start_condition = self.start_condition
+        pre_grasp.end_condition = pre_grasp
+        self.add_goal(pre_grasp)
+
+        ap_pre_grasp = AlignPlanes(name='grasp align',
+                                   root_link=root_link,
+                                   tip_link=tip_link,
+                                   tip_normal=tip_align_axis,
+                                   goal_normal=handle_align_axis)
+        ap_pre_grasp.start_condition = self.start_condition
+        self.add_task(ap_pre_grasp)
+
+        sleep_cancel = Sleep(seconds=timeout, name='ft sleep cancel')
+        sleep_cancel.start_condition = pre_grasp
+        self.add_monitor(sleep_cancel)
+
+        ft_monitor = PayloadForceTorque(threshold_enum=ForceTorqueThresholds.DOOR.value,
+                                        object_type='',
+                                        name='grasp ft monitor',
+                                        topic=ft_topic)
+        ft_monitor.start_condition = pre_grasp
+        self.add_monitor(ft_monitor)
+
+        ft_grasp = GraspBarOffset(name='ft grasp',
+                                  root_link=root_link,
+                                  tip_link=tip_link,
+                                  tip_grasp_axis=tip_grasp_axis,
+                                  bar_center=bar_center,
+                                  bar_axis=bar_axis,
+                                  bar_length=bar_length,
+                                  grasp_axis_offset=pre_grasp_axis_offset,
+                                  reference_linear_velocity=self.reference_linear_velocity,
+                                  reference_angular_velocity=self.reference_angular_velocity)
+        ft_grasp.start_condition = pre_grasp
+        ft_grasp.end_condition = ft_monitor
+        self.add_goal(ft_grasp)
+
+        retract = CartesianPosition(root_link=root_link,
+                                    tip_link=tip_link,
+                                    goal_point=tip_retract,
+                                    name='retract after ft')
+        retract.start_condition = ft_monitor
+        self.add_task(retract)
+
+        ft_cancel = CancelMotion(exception=ObjectForceTorqueThresholdException('Door not touched!'),
+                                 name='FT CancelMotion')
+        ft_cancel.start_condition = f'not {ft_monitor} and {sleep_cancel}'
+        self.add_monitor(ft_cancel)
+
+        self.observation_expression = retract.observation_expression
+
+
 class OpenDoorGoal(Goal):
     def __init__(self,
                  tip_link: PrefixName,
@@ -1071,23 +1182,6 @@ class OpenDoorGoal(Goal):
                                                 name=f'{name}_handle_joint_monitor')
         self.add_monitor(handle_state_monitor)
 
-        sleep_mon = Sleep(seconds=0.5, name='Sleep Monitor')
-        sleep_mon.start_condition = handle_state_monitor
-        self.add_monitor(sleep_mon)
-
-        hinge_state = {door_hinge_id: limit_hinge}
-        hinge_state_monitor = JointGoalReached(goal_state=hinge_state,
-                                               threshold=0.01,
-                                               name=f'{name}_hinge_joint_monitor')
-        hinge_state_monitor.start_condition = sleep_mon
-        self.add_monitor(hinge_state_monitor)
-
-        local_min_mon = LocalMinimumReached(name='LocalMinMonitor')
-        local_min_mon.start_condition = sleep_mon
-        self.add_monitor(local_min_mon)
-
-        end_con = f'{hinge_state_monitor.name} and {local_min_mon.name} or ({self.end_condition})'
-
         jvl = JointVelocityLimit(joint_names=["wrist_flex_joint", "wrist_roll_joint"],
                                  max_velocity=0.03,
                                  name='Wrist Velocity Limits')
@@ -1098,7 +1192,6 @@ class OpenDoorGoal(Goal):
                          environment_link=handle_name,
                          goal_joint_state=limit_handle,
                          name='OpenHandle')
-        open_goal.end_condition = end_con
         self.add_goal(open_goal)
 
         jpl = JointPositionList(goal_state={door_hinge_id: max_limit_hinge},
@@ -1107,17 +1200,52 @@ class OpenDoorGoal(Goal):
         jpl.end_condition = handle_state_monitor
         self.add_task(jpl)
 
+        x_goal = cas.Vector3()
+        x_goal.reference_frame = handle_name
+        x_goal.z = -1
+
+        base_link = god_map.world.search_for_link_name('base_link', 'hsrb')
+        map_link = god_map.world.search_for_link_name('map')
+
+        x_base = cas.Vector3()
+        x_base.reference_frame = base_link
+        x_base.y = 1
+
+        apl = AlignPlanes(root_link=map_link,
+                          tip_link=base_link,
+                          goal_normal=x_goal,
+                          tip_normal=x_base,
+                          name='AlignBaseWithDoor')
+        apl.start_condition = handle_state_monitor
+        self.add_task(apl)
+
+        goal_states = {
+            'head_pan_joint': 0,
+            'head_tilt_joint': 0,
+            'arm_lift_joint': 0,
+            'arm_flex_joint': 0,
+            'arm_roll_joint': 0,
+            'wrist_flex_joint': 0,
+            'wrist_roll_joint': 0
+        }
+        jps = JointPositionListStop(goal_state=goal_states,
+                                    name='StopJointsFromMoving')
+        jps.start_condition = handle_state_monitor
+        self.add_task(jps)
+
         open_goal2 = Open(tip_link=tip_link,
                           environment_link=link_id,
                           goal_joint_state=limit_hinge,
                           name='OpenHinge')
-        open_goal2.start_condition = sleep_mon
-        open_goal2.end_condition = end_con
+        open_goal2.start_condition = handle_state_monitor
         self.add_goal(open_goal2)
 
-        end_motion = EndMotion(name='End Motion Monitor')
-        end_motion.start_condition = end_con
-        self.add_monitor(end_motion)
+        goal_state = {door_hinge_id: limit_hinge}
+        hinge_state_monitor = JointGoalReached(name='HingeMonitor', goal_state=goal_state)
+        self.start_condition = handle_state_monitor
+        self.add_monitor(hinge_state_monitor)
+
+        self.observation_expression = hinge_state_monitor.observation_expression
 
 
 class MoveAroundDishwasher(Goal):
@@ -1264,15 +1392,14 @@ class GraspBarOffset(Goal):
     grasp_axis_offset: cas.Vector3
 
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  tip_grasp_axis: cas.Vector3,
                  bar_center: cas.Point3,
                  bar_axis: cas.Vector3,
                  bar_length: float,
                  grasp_axis_offset: cas.Vector3,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
+                 threshold: float = 0.01,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
@@ -1294,8 +1421,8 @@ class GraspBarOffset(Goal):
         :param reference_angular_velocity: rad/s
         :param weight:
         """
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name=name)
@@ -1350,8 +1477,10 @@ class GraspBarOffset(Goal):
                                         weight=self.weight)
         # self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
-        god_map.debug_expression_manager.add_debug_expression('nearest', nearest)
+        god_map.debug_expression_manager.add_debug_expression(f'{name}_nearest', nearest)
         god_map.debug_expression_manager.add_debug_expression('tip V tip grasp axis', tip_V_tip_grasp_axis)
+
+        self.observation_expression = cas.less_equal(dist, threshold)
 
 
 def check_context_element(name: str,
