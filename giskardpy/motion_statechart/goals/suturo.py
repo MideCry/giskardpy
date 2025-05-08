@@ -1125,6 +1125,14 @@ class GraspWithForceTorqueGoal(Goal):
         ft_grasp.end_condition = ft_monitor
         self.add_goal(ft_grasp)
 
+        ap_tip_grasp = AlignPlanes(name='tip grasp align',
+                                   root_link=root_link,
+                                   tip_link=tip_link,
+                                   tip_normal=tip_grasp_axis,
+                                   goal_normal=bar_axis)
+        ap_tip_grasp.start_condition = pre_grasp
+        self.add_task(ap_tip_grasp)
+
         retract = CartesianPosition(root_link=root_link,
                                     tip_link=tip_link,
                                     goal_point=tip_retract,
