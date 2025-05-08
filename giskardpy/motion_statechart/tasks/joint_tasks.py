@@ -1,7 +1,7 @@
 from typing import Optional, Dict, List, Tuple
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.data_types.data_types import Derivatives, PrefixName
+from giskardpy.data_types.data_types import Derivatives, PrefixName, ObservationState
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint, JustinTorso
@@ -309,6 +309,8 @@ class JointPositionListStop(Task):
                                          weight=self.weight,
                                          task_expression=current)
             god_map.debug_expression_manager.add_debug_expression(name, goal)
+
+        self.observation_expression = ObservationState.false
 
 
 class JustinTorsoLimit(Task):
