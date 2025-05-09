@@ -19,7 +19,7 @@ from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.monitors.force_torque_monitor import PayloadForceTorque
 from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_statechart.monitors.monitors import Monitor, CancelMotion
+from giskardpy.motion_statechart.monitors.monitors import Monitor, CancelMotion, LocalMinimumReached
 from giskardpy.motion_statechart.monitors.payload_monitors import Sleep
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointVelocityLimit, JointPositionListStop
@@ -1136,17 +1136,24 @@ class GraspWithForceTorqueGoal(Goal):
         retract = CartesianPosition(root_link=root_link,
                                     tip_link=tip_link,
                                     goal_point=tip_retract,
-                                    name='retract after ft')
+                                    name='retract after ft',
+                                    reference_velocity=self.reference_linear_velocity)
         retract.start_condition = ft_monitor
+        retract.end_condition = retract
         self.add_task(retract)
+
+        # end_monitor = LocalMinimumReached(name='retract end')
+        # end_monitor = Sleep(name='post retract sleep', seconds=0.5)
+        # end_monitor.start_condition = retract
+        # self.add_monitor(end_monitor)
 
         ft_cancel = CancelMotion(exception=ObjectForceTorqueThresholdException('Door not touched!'),
                                  name='FT CancelMotion')
         ft_cancel.start_condition = f'not {ft_monitor} and {sleep_cancel}'
         self.add_monitor(ft_cancel)
 
+        # self.observation_expression = end_monitor.observation_expression
         self.observation_expression = retract.observation_expression
-
 
 class OpenDoorGoal(Goal):
     def __init__(self,
