@@ -1137,22 +1137,17 @@ class GraspWithForceTorqueGoal(Goal):
                                     tip_link=tip_link,
                                     goal_point=tip_retract,
                                     name='retract after ft',
-                                    reference_velocity=self.reference_linear_velocity)
+                                    reference_velocity=self.reference_linear_velocity,
+                                    threshold=0.001)
         retract.start_condition = ft_monitor
         retract.end_condition = retract
         self.add_task(retract)
-
-        # end_monitor = LocalMinimumReached(name='retract end')
-        # end_monitor = Sleep(name='post retract sleep', seconds=0.5)
-        # end_monitor.start_condition = retract
-        # self.add_monitor(end_monitor)
 
         ft_cancel = CancelMotion(exception=ObjectForceTorqueThresholdException('Door not touched!'),
                                  name='FT CancelMotion')
         ft_cancel.start_condition = f'not {ft_monitor} and {sleep_cancel}'
         self.add_monitor(ft_cancel)
 
-        # self.observation_expression = end_monitor.observation_expression
         self.observation_expression = retract.observation_expression
 
 class OpenDoorGoal(Goal):
