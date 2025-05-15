@@ -9,16 +9,17 @@ class GripperTypes(Enum):
     NEUTRAL = 'neutral'
 
 
-# List of Methods that need Thresholds for force_monitor: GraspObjectCarefully(might include Doors?), Placing
+# List of Methods that need Thresholds for force_monitor
 @unique
 class ForceTorqueThresholds(Enum):
     GRASP = 1
     PLACE = 2
     DOOR = 3
     DISHDOOR = 4
-    FT_Tilt = 5  # Pouring (not currently in use)
+    POURING = 5  # Pouring (not currently in use)
     SHELF_GRASP = 6
-
+    WIPING = 7
+    HRI_GRASP = 8
 
 # List of Objects that need to be differentiated between when placing method is used
 @unique
