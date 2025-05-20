@@ -1192,11 +1192,11 @@ class OpenDoorGoal(Goal):
                                                 name=f'{name}_handle_joint_monitor')
         self.add_monitor(handle_state_monitor)
 
-        jvl = JointVelocityLimit(joint_names=["wrist_flex_joint", "wrist_roll_joint"],
-                                 max_velocity=0.03,
-                                 name='Wrist Velocity Limits')
-        jvl.start_condition = handle_state_monitor
-        self.add_task(jvl)
+        # jvl = JointVelocityLimit(joint_names=["wrist_flex_joint", "wrist_roll_joint"],
+        #                          max_velocity=0.03,
+        #                          name='Wrist Velocity Limits')
+        # jvl.start_condition = handle_state_monitor
+        # self.add_task(jvl)
 
         open_goal = Open(tip_link=tip_link,
                          environment_link=handle_name,
@@ -1221,13 +1221,13 @@ class OpenDoorGoal(Goal):
         x_base.reference_frame = base_link
         x_base.y = 1
 
-        apl = AlignPlanes(root_link=map_link,
-                          tip_link=base_link,
-                          goal_normal=x_goal,
-                          tip_normal=x_base,
-                          name='AlignBaseWithDoor')
-        apl.start_condition = handle_state_monitor
-        self.add_task(apl)
+        # apl = AlignPlanes(root_link=map_link,
+        #                   tip_link=base_link,
+        #                   goal_normal=x_goal,
+        #                   tip_normal=x_base,
+        #                   name='AlignBaseWithDoor')
+        # apl.start_condition = handle_state_monitor
+        # self.add_task(apl)
 
         goal_states = {
             'head_pan_joint': 0,
