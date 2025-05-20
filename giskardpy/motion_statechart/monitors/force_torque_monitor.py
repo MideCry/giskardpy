@@ -25,7 +25,7 @@ class PayloadForceTorque(PayloadMonitor):
                  threshold_enum: int,
                  topic: str,
                  # object_type is needed to differentiate between objects with different thresholds
-                 # (not needed for door, just pass an empty string)
+                 # (not needed for door or wiping, so just pass an empty string)
                  object_type: Optional[str] = None,
                  name: Optional[str] = None,
                  stay_true: bool = True):
@@ -181,6 +181,7 @@ class PlaceThresholdStrategy(ThresholdStrategy):
     def __init__(self, object_type):
         self.object_type = object_type
 
+    # TODO: Change approach of how values are being chosen (f.e data driven approach or soft thresholding)
     def check_thresholds(self, rob_force, rob_torque):
 
         # case for placing "normal" objects (namely Milk, Cereal and cups)
@@ -264,6 +265,7 @@ class DoorThresholdStrategy(ThresholdStrategy):
         else:
             return False
 
+
 class ShelfGraspThresholdStrategy(ThresholdStrategy):
     reference_frame = 'hand_gripper_tool_frame'
 
@@ -273,6 +275,32 @@ class ShelfGraspThresholdStrategy(ThresholdStrategy):
         if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(
                 f'HIT DOOR!: Z:{rob_force[2]}')
+            return True
+        else:
+            return False
+
+
+class WipeThresholdStrategy(ThresholdStrategy):
+    reference_frame = 'hand_gripper_tool_frame'
+
+    def check_thresholds(self, rob_force, rob_torque):
+        # TODO: Establish proper threshold value
+        force_z_threshold = 1
+        if abs(rob_force[2]) >= force_z_threshold:
+            get_middleware().loginfo(f'HIT TABLE!: Z:{rob_force[2]}')
+            return True
+        else:
+            return False
+
+
+class HRIGThresholdStrategy(ThresholdStrategy):
+    reference_frame = 'hand_gripper_tool_frame'
+
+    def check_thresholds(self, rob_force, rob_torque):
+        # TODO: Establish proper threshold value
+        force_z_threshold = 1
+        if abs(rob_force[2]) >= force_z_threshold:
+            get_middleware().loginfo(f'HIT TABLE!: Z:{rob_force[2]}')
             return True
         else:
             return False
@@ -298,5 +326,10 @@ class ThresholdStrategyFactory:
 
         elif threshold_enum == ForceTorqueThresholds.SHELF_GRASP.value:
             return ShelfGraspThresholdStrategy()
+
+        elif threshold_enum == ForceTorqueThresholds.WIPING.value:
+            return WipeThresholdStrategy()
+        elif threshold_enum == ForceTorqueThresholds.HRI_GRASP.value:
+            return HRIGThresholdStrategy()
         else:
             raise ValueError(f"Invalid threshold name: {threshold_enum}")
