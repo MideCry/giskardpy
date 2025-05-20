@@ -24,8 +24,7 @@ RUN cd ~ && \
     cmake --build build --config Release && \
     cmake --build build --target install && \
     cd python && \
-    python3 setup.py install && \
-    mv build/lib.linux-x86_64-cpython-38/qpSWIFT.cpython-38-x86_64-linux-gnu.so /usr/local/lib/python3.8/dist-packages/
+    python3 setup.py install
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \
@@ -33,3 +32,12 @@ RUN mkdir -p ~/bpb && \
     git clone https://github.com/SemRoCo/bullet3.git && \
     cd bullet3 && \
     ./build_better_pybullet.sh
+
+# Download PR2-Repo and compile urdf
+RUN cd ~ && \
+    pip3 install xacro && \
+    git clone https://github.com/code-iai/iai_pr2 && \
+    sed -i 's|$(find iai_pr2_description)|/root/iai_pr2/iai_pr2_description|g' ~/iai_pr2/iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro && \
+    xacro ~/iai_pr2/iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro > pr2.urdf && \
+    sed -i 's|package://|/root/iai_pr2/|g' pr2.urdf && \
+    sed -i 's|/pr2_description/|/iai_pr2_description/|g' pr2.urdf

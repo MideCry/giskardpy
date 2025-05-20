@@ -5,17 +5,15 @@ from enum import Enum
 from itertools import product, combinations_with_replacement, combinations
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
 
-from pkg_resources import resource_filename
-
 import numpy as np
 from lxml import etree
 
 from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.data_types.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
+from giskardpy.middleware import get_middleware
 from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.middleware import get_middleware
 from line_profiler import profile
 
 np.random.seed(1337)
@@ -288,7 +286,7 @@ class Collisions:
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
 
-    # @profile
+    # 
     def get_self_collisions(self, link_a: PrefixName, link_b: PrefixName) -> SortedCollisionResults:
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
@@ -385,6 +383,7 @@ class CollisionWorldSynchronizer:
 
     def load_self_collision_matrix_from_srdf(self, path: str, group_name: str) \
             -> Tuple[Optional[dict], Set[PrefixName]]:
+        from pkg_resources import resource_filename
         if not self.is_collision_checking_enabled:
             return {}, set()
         if group_name not in self.self_collision_matrix_cache:
@@ -407,7 +406,7 @@ class CollisionWorldSynchronizer:
                             link_a = god_map.world.search_for_link_name(link_a)
                             link_b = god_map.world.search_for_link_name(link_b)
                         except UnknownLinkException as e:
-                            get_middleware().logwarn(e)
+                            get_middleware().logwarn(str(e))
                             continue
                         reason_id = child.attrib['reason']
                         if link_a not in god_map.world.link_names_with_collisions \
@@ -423,7 +422,7 @@ class CollisionWorldSynchronizer:
                         try:
                             link_name = god_map.world.search_for_link_name(child.attrib['link'])
                         except UnknownLinkException as e:
-                            get_middleware().logwarn(e)
+                            get_middleware().logwarn(str(e))
                             continue
                         self.disabled_links.add(link_name)
 
@@ -697,12 +696,12 @@ class CollisionWorldSynchronizer:
 
         # %% disabled links
         for link_name in sorted(disabled_links):
-            child = etree.SubElement(root, 'disable_all_collisions')
+            child = etree.SubElement(root, self.srdf_disable_all_collisions)
             child.set('link', link_name.short_name)
 
         # %% self collision matrix
         for (link_a, link_b), reason in sorted(self_collision_matrix.items()):
-            child = etree.SubElement(root, 'disable_self_collision')
+            child = etree.SubElement(root, self.srdf_disable_self_collision)
             child.set('link1', link_a.short_name)
             child.set('link2', link_b.short_name)
             child.set('reason', reason.name)

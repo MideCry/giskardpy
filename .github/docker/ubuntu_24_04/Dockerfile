@@ -39,11 +39,23 @@ RUN cd ~ && \
     cmake --build build --config Release && \
     cmake --build build --target install && \
     cd python && \
-    python3 setup.py install
+    workon giskardpy && \
+    pip install .
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \
     cd ~/bpb && \
     git clone -b jazzy https://github.com/SemRoCo/bullet3.git && \
     cd bullet3 && \
+    workon giskardpy && \
     ./build_better_pybullet.sh
+
+# Download PR2-Repo and compile urdf
+RUN workon giskardpy && \
+    cd ~ && \
+    pip3 install xacro && \
+    git clone https://github.com/code-iai/iai_pr2 && \
+    sed -i 's|$(find iai_pr2_description)|/root/iai_pr2/iai_pr2_description|g' ~/iai_pr2/iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro && \
+    xacro ~/iai_pr2/iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro > pr2.urdf && \
+    sed -i 's|package://|/root/iai_pr2/|g' pr2.urdf && \
+    sed -i 's|/pr2_description/|/iai_pr2_description/|g' pr2.urdf

@@ -1,4 +1,4 @@
-from typing import Dict, List, TypeVar, Generic, Set, Optional
+from typing import Dict, List, TypeVar, Generic, Set, Optional, Tuple
 
 import numpy as np
 
@@ -32,6 +32,9 @@ class MotionGraphNodeStateManager(Generic[T]):
         self.god_map_path = god_map_path
         self.substitution_values = {}
 
+    def __len__(self) -> int:
+        return len(self.nodes)
+
     @property
     def life_cycle_state(self) -> np.ndarray:
         return self._life_cycle_state
@@ -40,7 +43,6 @@ class MotionGraphNodeStateManager(Generic[T]):
     def life_cycle_state(self, new_life_cycle: np.ndarray) -> None:
         self._life_cycle_state = new_life_cycle
         self.life_cycle_history.append(new_life_cycle.copy())
-
 
     def get_node_names(self) -> Set[str]:
         return set(self.key_to_idx.keys())
@@ -77,7 +79,7 @@ class MotionGraphNodeStateManager(Generic[T]):
         self.observation_state = np.ones(len(self.nodes)) * ObservationState.unknown
         life_cycle_state = np.zeros(len(self.nodes))
         for node_id, node in enumerate(self.nodes):
-            if cas.is_true_symbol(node.start_condition):
+            if node.start_condition == 'True':
                 life_cycle_state[node_id] = LifeCycleState.running
             else:
                 life_cycle_state[node_id] = LifeCycleState.not_started
@@ -124,10 +126,9 @@ class MotionGraphNodeStateManager(Generic[T]):
         prev_life_cycle_state = self.life_cycle_history[-2]
         life_cycle_state = self.life_cycle_history[-1]
         condition = (prev_life_cycle_state == LifeCycleState.not_started) & (life_cycle_state == LifeCycleState.running)
-        for idx in np.argwhere(condition).flatten():
-            node_name = self.nodes[idx].name
-            if node_name in self.substitution_values:
-                self.update_substitution_values(node_name=node_name)
+        indices = [i for i in np.flatnonzero(condition) if self.nodes[i].name in self.substitution_values]
+        for idx in indices:
+            self.update_substitution_values(node_name=self.nodes[idx].name)
 
     def __repr__(self) -> str:
         self_as_dict = self.get_state_as_dict()
@@ -135,7 +136,7 @@ class MotionGraphNodeStateManager(Generic[T]):
 
 
 @profile
-def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) -> CompiledFunction:
+def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) -> cas.Expression:
     state_updater = []
     node: MotionStatechartNode
     for node in node_state.nodes:
@@ -165,6 +166,4 @@ def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) ->
                                         else_result=state_symbol)
         state_updater.append(state_machine)
     state_updater = cas.Expression(state_updater)
-
-    symbols = node_state.get_life_cycle_state_symbols() + god_map.motion_statechart_manager.get_observation_state_symbols()
-    return state_updater.compile(symbols)
+    return state_updater

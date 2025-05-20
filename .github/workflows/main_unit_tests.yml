@@ -5,11 +5,10 @@ defaults:
 on:
   push:
     branches:
-      - master
-      - devel
-      - library_standalone
+      - giskard_library
   pull_request:
-#    branches:
+    branches:
+      - giskard_library
 #      - master
 #      - devel
   workflow_dispatch:
@@ -29,10 +28,17 @@ on:
         type: boolean
 
 jobs:
+  docker:
+    permissions:
+      contents: read
+      packages: write
+
+    uses: ./.github/workflows/publish_dockerfiles.yml
   # GitHub Repository-Owners can have uppercase letters.
   # Container Registry URLs need to be lowercase.
   # There is no easy way to get it to lowercase (that i found)
   to-lowercase:
+    needs: docker
     runs-on: ubuntu-latest
     outputs:
       repo_lowercase: ${{ steps.lowercase.outputs.repository }}
@@ -46,7 +52,7 @@ jobs:
       # Lets all tests finish, even if one test fails
       fail-fast: false
       matrix:
-        tests: [ "test_cas_wrapper", "test_symbol_manager", "test_math", "test_giskard_library"]
+        tests: [ "test_cas_wrapper", "test_symbol_manager", "test_giskard_library"]
         ubuntu_version: [ "20.04", "24.04"]
         qp_solver: [ qpSWIFT ]
     runs-on: ubuntu-latest
@@ -87,10 +93,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: 'giskardpy'
+      - name: move pr2.urdf to temp folder from root folder
+        run: mv /root/pr2.urdf /__w/giskardpy/giskardpy/giskardpy/test/urdfs/pr2.urdf
+#      - name: Setup upterm session
+#        if: ${{ matrix.tests == 'test_symbol_manager' && matrix.ubuntu_version == '20.04' }}
+#        uses: lhotari/action-upterm@v1
       - name: test
         run: |
-          cd giskardpy
-          python3 -m pytest -s test/${{ matrix.tests }}.py
+          cd giskardpy/test
+          # test_symbol_manager caused error "terminate called without an active exception" on ubuntu:20.04 
+          # adding -v fixes this. The error only occured on first run in github action and is not reproducable locally
+          # could alternativly be fixed by running some empty test beforehand
+          python3 -m pytest -v -s ${{ matrix.tests }}.py
   #    - name: Setup upterm session
   ##      if: always()
   #      if: failure()

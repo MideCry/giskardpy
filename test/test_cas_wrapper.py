@@ -6,14 +6,12 @@ import hypothesis.strategies as st
 import numpy as np
 from hypothesis import given, assume, settings
 
-from giskardpy import casadi_wrapper as cas
-from giskardpy.data_types.data_types import ObservationState
-from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
-from test.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
+from giskardpy import casadi_wrapper as cas
+from giskardpy.qp import pos_in_vel_limits as cas2
+from giskardpy.utils.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max, compare_orientations
-
 
 
 def logic_not(a):
@@ -294,6 +292,7 @@ class TestExpression(unittest.TestCase):
     def test_logic_or(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
+        s3 = cas.Symbol('s3')
         expr = cas.logic_or(cas.BinaryFalse, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
         expr = cas.logic_or(cas.BinaryTrue, s1)
@@ -305,6 +304,9 @@ class TestExpression(unittest.TestCase):
         expr = cas.logic_or(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_or(s1, s2)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
+
+        expr = cas.logic_or(s1, s2, s3)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
 
     def test_lt(self):
@@ -1578,6 +1580,45 @@ class TestCASWrapper(unittest.TestCase):
             return else_result
 
         actual = cas.compile_and_execute(lambda a: cas.if_eq_cases(a, b_result_cases, 0), [a])
+        expected = float(reference(a, b_result_cases, 0))
+        self.assertAlmostEqual(actual, expected)
+
+    @given(float_no_nan_no_inf())
+    def test_if_eq_cases_set(self, a):
+        b_result_cases = {(1, 1),
+                          (3, 3),
+                          (4, 4),
+                          (-1, -1),
+                          (0.5, 0.5),
+                          (-0.5, -0.5)}
+
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ == b:
+                    return if_result
+            return else_result
+
+        actual = cas.compile_and_execute(lambda a: cas.if_eq_cases(a, b_result_cases, 0), [a])
+        expected = float(reference(a, b_result_cases, 0))
+        self.assertAlmostEqual(actual, expected)
+
+
+    @given(float_no_nan_no_inf())
+    def test_if_eq_cases_grouped(self, a):
+        b_result_cases = [(1, 1),
+                          (3, 1),
+                          (4, 1),
+                          (-1, 3),
+                          (0.5, 3),
+                          (-0.5, 1)]
+
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ == b:
+                    return if_result
+            return else_result
+
+        actual = cas.compile_and_execute(lambda a: cas.if_eq_cases_grouped(a, b_result_cases, 0), [a])
         expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
 
