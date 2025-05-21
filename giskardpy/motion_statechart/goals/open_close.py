@@ -16,7 +16,7 @@ class Open(Goal):
                  tip_link: PrefixName,
                  environment_link: PrefixName,
                  goal_joint_state: Optional[float] = None,
-                 max_velocity: float = 100,
+                 max_velocity: float = 1.0,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None):
         """
@@ -46,7 +46,8 @@ class Open(Goal):
         goal_state = {self.joint_name.short_name: goal_joint_state}
         hinge_goal = JointPositionList(goal_state=goal_state,
                                        name=f'{self.name}/hinge',
-                                       weight=self.weight)
+                                       weight=self.weight,
+                                       max_velocity=max_velocity)
         self.add_task(hinge_goal)
 
         handle_pose = cas.TransMatrix(reference_frame=self.tip_link, child_frame=self.tip_link)

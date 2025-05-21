@@ -1188,20 +1188,15 @@ class OpenDoorGoal(Goal):
 
         handle_state = {handle_frame_id: limit_handle}
         handle_state_monitor = JointGoalReached(goal_state=handle_state,
-                                                threshold=0.01,
+                                                threshold=0.001,
                                                 name=f'{name}_handle_joint_monitor')
         self.add_monitor(handle_state_monitor)
-
-        # jvl = JointVelocityLimit(joint_names=["wrist_flex_joint", "wrist_roll_joint"],
-        #                          max_velocity=0.03,
-        #                          name='Wrist Velocity Limits')
-        # jvl.start_condition = handle_state_monitor
-        # self.add_task(jvl)
 
         open_goal = Open(tip_link=tip_link,
                          environment_link=handle_name,
                          goal_joint_state=limit_handle,
-                         name='OpenHandle')
+                         name='OpenHandle',
+                         max_velocity=0.3)
         self.add_goal(open_goal)
 
         jpl = JointPositionList(goal_state={door_hinge_id: max_limit_hinge},
@@ -1221,13 +1216,18 @@ class OpenDoorGoal(Goal):
         x_base.reference_frame = base_link
         x_base.y = 1
 
-        # apl = AlignPlanes(root_link=map_link,
-        #                   tip_link=base_link,
-        #                   goal_normal=x_goal,
-        #                   tip_normal=x_base,
-        #                   name='AlignBaseWithDoor')
-        # apl.start_condition = handle_state_monitor
-        # self.add_task(apl)
+        apl = AlignPlanes(root_link=map_link,
+                          tip_link=base_link,
+                          goal_normal=x_goal,
+                          tip_normal=x_base,
+                          name='AlignBaseWithDoor')
+        apl.start_condition = handle_state_monitor
+        self.add_task(apl)
+
+        goal_state = {door_hinge_id: limit_hinge/10}
+        unlock_state_monitor = JointGoalReached(name='UnlockMonitor', goal_state=goal_state)
+        unlock_state_monitor.start_condition = handle_state_monitor
+        self.add_monitor(unlock_state_monitor)
 
         goal_states = {
             'head_pan_joint': 0,
@@ -1239,20 +1239,23 @@ class OpenDoorGoal(Goal):
             'wrist_roll_joint': 0
         }
         jps = JointPositionListStop(goal_state=goal_states,
-                                    name='StopJointsFromMoving')
+                                    name='StopJointsFromMoving',
+                                    max_velocity=0)
         jps.start_condition = handle_state_monitor
+        jps.end_condition = unlock_state_monitor
         self.add_task(jps)
 
         open_goal2 = Open(tip_link=tip_link,
                           environment_link=link_id,
                           goal_joint_state=limit_hinge,
-                          name='OpenHinge')
+                          name='OpenHinge',
+                          max_velocity=0.5)
         open_goal2.start_condition = handle_state_monitor
         self.add_goal(open_goal2)
 
         goal_state = {door_hinge_id: limit_hinge}
         hinge_state_monitor = JointGoalReached(name='HingeMonitor', goal_state=goal_state)
-        self.start_condition = handle_state_monitor
+        hinge_state_monitor.start_condition = handle_state_monitor
         self.add_monitor(hinge_state_monitor)
 
         self.observation_expression = hinge_state_monitor.observation_expression
