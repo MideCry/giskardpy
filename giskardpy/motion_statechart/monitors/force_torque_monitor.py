@@ -298,7 +298,7 @@ class HRIGThresholdStrategy(ThresholdStrategy):
 
     def check_thresholds(self, rob_force, rob_torque):
         # TODO: Establish proper threshold value
-        force_z_threshold = 1
+        force_z_threshold = 20  # maybe replace with y-torque, depending on whether this value works well or not
         if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(f'HIT TABLE!: Z:{rob_force[2]}')
             return True
@@ -329,6 +329,7 @@ class ThresholdStrategyFactory:
 
         elif threshold_enum == ForceTorqueThresholds.WIPING.value:
             return WipeThresholdStrategy()
+
         elif threshold_enum == ForceTorqueThresholds.HRI_GRASP.value:
             return HRIGThresholdStrategy()
         else:
