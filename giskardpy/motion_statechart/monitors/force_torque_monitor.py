@@ -112,9 +112,9 @@ class GraspThresholdStrategy(ThresholdStrategy):
         get_middleware().logerr(f'OBJECT:{self.object_type}')
         if self.object_type == ObjectTypes.OT_Default.value:
 
-            torque_threshold = 2
+            torque_y_threshold = 2
 
-            if abs(rob_torque[1]) > torque_threshold:
+            if abs(rob_torque[1]) > torque_y_threshold:
                 get_middleware().loginfo(f'HIT GWC: TORQUE_Y:{rob_torque[1]}')
                 print(f'HIT GWC: {rob_torque[1]}')
                 return True
@@ -126,9 +126,9 @@ class GraspThresholdStrategy(ThresholdStrategy):
         # case for grasping cutlery
         elif self.object_type == ObjectTypes.OT_Cutlery.value:
 
-            force_threshold = 85
+            force_z_threshold = 85
 
-            if abs(rob_force[2]) > force_threshold:
+            if abs(rob_force[2]) > force_z_threshold:
                 get_middleware().loginfo(f'HIT GWC: FORCE_Z:{rob_torque[2]}')
                 return True
             else:
@@ -138,10 +138,10 @@ class GraspThresholdStrategy(ThresholdStrategy):
         # NOT CURRENTLY USED AS PLATES ARE NEITHER PLACED NOR PICKED UP DUE TO HSRs GRIPPER
         elif self.object_type == ObjectTypes.OT_Plate.value:
 
-            torque_threshold = 0.02
+            torque_y_threshold = 0.02
 
-            if (abs(rob_force[1]) > torque_threshold or
-                    abs(rob_force[1]) > torque_threshold):
+            if (abs(rob_force[1]) > torque_y_threshold or
+                    abs(rob_force[1]) > torque_y_threshold):
                 get_middleware().loginfo(f'HIT GWC: {rob_force[0]};{rob_torque[1]}')
                 return False
             else:
@@ -150,9 +150,9 @@ class GraspThresholdStrategy(ThresholdStrategy):
         # case for grasping Bowl
         elif self.object_type == ObjectTypes.OT_Bowl.value:
 
-            force_threshold = 16
+            force_z_threshold = 16
 
-            if abs(rob_force[2]) >= force_threshold:
+            if abs(rob_force[2]) >= force_z_threshold:
                 get_middleware().loginfo(f'HIT GWC: {rob_force[2]}')
                 print(f'HIT GWC: {rob_force[2]}')
                 return True
@@ -164,10 +164,10 @@ class GraspThresholdStrategy(ThresholdStrategy):
         # case for Grasping Tray
         elif self.object_type == ObjectTypes.OT_Tray.value:
 
-            force_threshold = 60.0
+            force_y_threshold = 60.0
 
             # TODO: change to correct Axis
-            if abs(rob_force[1]) > force_threshold:
+            if abs(rob_force[1]) > force_y_threshold:
                 get_middleware().loginfo(f'HIT GWC: {rob_force[1]}')
                 return True
             else:
@@ -299,6 +299,7 @@ class HRIGThresholdStrategy(ThresholdStrategy):
     def check_thresholds(self, rob_force, rob_torque):
         # TODO: Establish proper threshold value
         force_z_threshold = 20  # maybe replace with y-torque, depending on whether this value works well or not
+                                # (y-torque) would be similar value
         if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(f'HIT TABLE!: Z:{rob_force[2]}')
             return True
