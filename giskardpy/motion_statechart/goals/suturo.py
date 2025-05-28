@@ -1150,6 +1150,7 @@ class GraspWithForceTorqueGoal(Goal):
 
         self.observation_expression = retract.observation_expression
 
+
 class OpenDoorGoal(Goal):
     def __init__(self,
                  tip_link: PrefixName,
