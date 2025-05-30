@@ -264,6 +264,7 @@ class JointPositionListStop(Task):
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  max_velocity: float = 1,
+                 threshold: float = 0.01,
                  name: Optional[str] = None):
         """
         Calls JointPosition for a list of joints.
@@ -310,7 +311,9 @@ class JointPositionListStop(Task):
                                          task_expression=current)
             god_map.debug_expression_manager.add_debug_expression(name, goal)
 
-        self.observation_expression = ObservationState.false
+        joint_monitor = JointGoalReached(goal_state=goal_state,
+                                         threshold=threshold)
+        self.observation_expression = joint_monitor.observation_expression
 
 
 class JustinTorsoLimit(Task):
