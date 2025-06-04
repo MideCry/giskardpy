@@ -21,6 +21,7 @@ class PrePushDoor(Goal):
                  threshold: float = 0.01,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
+                 offset: Optional[cas.Vector3] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None):
         """
@@ -31,6 +32,9 @@ class PrePushDoor(Goal):
         self.door_object = god_map.world.search_for_link_name(door_object)
         object_joint_name = god_map.world.get_movable_parent_joint(self.door_object)
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(object_joint_name).axis)
+
+        if offset is None:
+            offset = cas.Vector3().from_xyz(0, 0, 0, self.root)
 
         self.handle = god_map.world.search_for_link_name(door_handle)
         self.reference_linear_velocity = reference_linear_velocity
@@ -43,6 +47,9 @@ class PrePushDoor(Goal):
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_T_door = god_map.world.compose_fk_expression(self.root, self.door_object)
+        root_V_offset = god_map.world.transform(self.root, offset)
+        root_T_door = root_T_door + root_V_offset
+
         door_P_handle = god_map.world.compute_fk_point(self.door_object, self.handle)
         temp_point = np.asarray([door_P_handle.x.to_np(), door_P_handle.y.to_np(), door_P_handle.z.to_np()])
 
