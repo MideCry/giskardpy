@@ -256,7 +256,7 @@ class DoorThresholdStrategy(ThresholdStrategy):
     reference_frame = 'hand_gripper_tool_frame'
 
     def check_thresholds(self, rob_force, rob_torque):
-        force_z_threshold = 40
+        force_z_threshold = 80
 
         if abs(rob_force[2]) >= force_z_threshold:
             get_middleware().loginfo(
