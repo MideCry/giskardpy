@@ -21,6 +21,7 @@ class ForceTorqueThresholds(Enum):
     WIPING = 7
     HRI_GRASP = 8
 
+
 # List of Objects that need to be differentiated between when placing method is used
 @unique
 class ObjectTypes(Enum):
@@ -52,3 +53,9 @@ class TakePoseTypes(Enum):
     CARRY = 'carry'
     TEST = 'test'
     PRE_TRAY = 'pre_tray'
+
+
+@unique
+class MoveAroundHingeAlign(int, Enum):
+    LAST = 0
+    ALL = 1
