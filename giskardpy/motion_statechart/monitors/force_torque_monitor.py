@@ -21,11 +21,11 @@ from giskardpy.data_types.suturo_types import ForceTorqueThresholds, ObjectTypes
 
 class PayloadForceTorque(PayloadMonitor):
     def __init__(self,
-                 # threshold_enum is needed here for the class to be able to handle the suturo_types appropriately
+                 # threshold_enum is needed for the class to be able to handle the suturo_types appropriately
                  threshold_enum: int,
                  topic: str,
                  # object_type is needed to differentiate between objects with different thresholds
-                 # (not needed for door or wiping, so just pass an empty string)
+                 # (not needed for door, wiping or HRI, so just pass an empty string)
                  object_type: Optional[str] = None,
                  name: Optional[str] = None,
                  stay_true: bool = True):
