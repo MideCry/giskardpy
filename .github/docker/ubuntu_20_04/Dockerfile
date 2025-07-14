@@ -17,14 +17,7 @@ RUN sudo apt install libeigen3-dev && \
     pip3 install -r requirements.txt
 
 # Install qpSWIFT
-RUN cd ~ && \
-    git clone https://github.com/SemRoCo/qpSWIFT && \
-    cd qpSWIFT && \
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build --config Release && \
-    cmake --build build --target install && \
-    cd python && \
-    python3 setup.py install
+RUN pip3 install pybind11 qpSWIFT-sparse-bindings
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \
