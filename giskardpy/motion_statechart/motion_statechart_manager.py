@@ -1,4 +1,5 @@
 import ast
+import os
 from collections import OrderedDict
 from functools import cached_property
 from itertools import chain
@@ -54,10 +55,18 @@ class MotionStatechartManager:
         self.reset()
 
     def add_monitor_package_path(self, path: str) -> None:
-        self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
+        try:
+            classes = get_all_classes_in_package(path, Monitor)
+        except ModuleNotFoundError:
+            return
+        self.allowed_monitor_types.update(classes)
 
     def add_task_package_path(self, path: str) -> None:
-        self.allowed_task_types.update(get_all_classes_in_package(path, Task))
+        try:
+            classes = get_all_classes_in_package(path, Task)
+        except ModuleNotFoundError:
+            return
+        self.allowed_task_types.update(classes)
 
     def add_goal_package_path(self, path: str) -> None:
         self.allowed_goal_types.update(get_all_classes_in_package(path, Goal))
