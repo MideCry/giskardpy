@@ -107,8 +107,6 @@ class GraspThresholdStrategy(ThresholdStrategy):
         self.object_type = object_type
 
     def check_thresholds(self, rob_force, rob_torque):
-        # Implement the logic for checking thresholds in GRASP context case for grasping "normal" objects
-        # (namely Milk, Cereal and cups)
         get_middleware().logerr(f'OBJECT:{self.object_type}')
         if self.object_type == ObjectTypes.OT_Default.value:
 
@@ -161,7 +159,7 @@ class GraspThresholdStrategy(ThresholdStrategy):
                 print(f'MISS GWC: {rob_force[2]}')
                 return False
 
-        # case for Grasping Tray
+        # case for Grasping Tray (not currently in use since we don't actually pick up the tray)
         elif self.object_type == ObjectTypes.OT_Tray.value:
 
             force_y_threshold = 60.0
@@ -172,7 +170,6 @@ class GraspThresholdStrategy(ThresholdStrategy):
                 return True
             else:
                 return False
-        # if no valid object_type has been declared in method parameters
         else:
             raise Exception("No valid object_type found, unable to determine placing thresholds!")
 
@@ -247,7 +244,6 @@ class PlaceThresholdStrategy(ThresholdStrategy):
                 return True
             else:
                 return False
-        # if no valid object_type has been declared in method parameters
         else:
             raise Exception("No valid object_type found, unable to determine placing thresholds!")
 
