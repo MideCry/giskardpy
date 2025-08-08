@@ -48,9 +48,7 @@ class MotionStatechartManager:
         self.allowed_task_types = {}
         self.allowed_goal_types = {}
         self.add_monitor_package_path('giskardpy.motion_statechart.monitors')
-        self.add_monitor_package_path('giskardpy_ros.monitors')
         self.add_task_package_path('giskardpy.motion_statechart.tasks')
-        self.add_task_package_path('giskardpy_ros.tasks')
         self.add_goal_package_path('giskardpy.motion_statechart.goals')
         self.reset()
 
