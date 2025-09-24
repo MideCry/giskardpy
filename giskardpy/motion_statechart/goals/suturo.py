@@ -269,7 +269,6 @@ class GraspObject(ObjectGoal):
 
         self.goal_point = god_map.world.transform(self.reference_link, root_goal_point)
 
-        # TODO: Refactor so that grasping from above can be used with Tray
         if self.grasp == GraspTypes.ABOVE.value:
             self.goal_vertical_axis.x = self.standard_forward.x
             self.goal_vertical_axis.y = self.standard_forward.y
