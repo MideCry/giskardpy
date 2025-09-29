@@ -1,6 +1,6 @@
 name: Trigger giskardpy_ros ros1-noetic-main Tests
 on:
-  pull_request_target:
+  pull_request_target: # pull_request_target is vulnerable. do not run untrusted code in this workflow
     types: [opened, synchronize, reopened]
   push:
     branches:
