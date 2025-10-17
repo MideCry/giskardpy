@@ -76,6 +76,8 @@ If it doesn't work, make sure that your ```$PYTHONPATH``` includes something lik
 ### Tutorials
 https://github.com/SemRoCo/giskardpy/wiki
 
+Try it out in our Virtual Research building: https://vrb.ease-crc.org/explore-labs/giskard-lab/
+
 ### How to cite
 ```
 @phdthesis{stelter25giskard,
