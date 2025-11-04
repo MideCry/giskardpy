@@ -59,7 +59,7 @@ Install them like this:
 ```
 workon giskardpy
 mkdir -p ~/libs && cd ~/libs                # choose a place where you want to build pybullet
-git clone -b jazzy https://github.com/SemRoCo/bullet3.git
+git clone https://github.com/SemRoCo/bullet3.git
 pip install .
 ```
 To test your installation do:
