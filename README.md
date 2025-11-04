@@ -60,9 +60,7 @@ Install them like this:
 workon giskardpy
 mkdir -p ~/libs && cd ~/libs                # choose a place where you want to build pybullet
 git clone -b jazzy https://github.com/SemRoCo/bullet3.git
-cd bullet3                                  # be sure to be in the bullet3 folder
-./build_better_pybullet.sh                  # this script will also clone and build pybind11 into libs
-source ~/.bashrc                            # the script adds a python path modification to your bashrc
+pip install .
 ```
 To test your installation do:
 ```
