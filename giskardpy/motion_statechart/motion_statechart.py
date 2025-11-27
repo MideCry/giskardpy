@@ -116,11 +116,21 @@ class LifeCycleState(State):
         for node in self.motion_statechart.nodes:
             state_symbol = node.life_cycle_variable
 
-            not_started_transitions = cas.if_else(
-                condition=node.start_condition == cas.TrinaryTrue,
-                if_result=cas.Expression(LifeCycleValues.RUNNING),
-                else_result=cas.Expression(LifeCycleValues.NOT_STARTED),
-            )
+            if node.parent_node is None:
+                not_started_transitions = cas.if_else(
+                    condition=node.start_condition == cas.TrinaryTrue,
+                    if_result=cas.Expression(LifeCycleValues.RUNNING),
+                    else_result=cas.Expression(LifeCycleValues.NOT_STARTED),
+                )
+            else:
+                not_started_transitions = cas.if_else(
+                    condition=cas.trinary_logic_and(
+                        node.start_condition == cas.TrinaryTrue,
+                        cas.trinary_logic_not(node.parent_node.end_condition),
+                    ),
+                    if_result=cas.Expression(LifeCycleValues.RUNNING),
+                    else_result=cas.Expression(LifeCycleValues.NOT_STARTED),
+                )
             running_transitions = cas.if_cases(
                 cases=[
                     (
