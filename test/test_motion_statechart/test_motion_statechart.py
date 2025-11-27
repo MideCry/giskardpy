@@ -56,6 +56,7 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestNestedGoal,
     ConstFalseNode,
     TestRunAfterStop,
+    TestEndBeforeStart,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import angle_between_vector
@@ -733,10 +734,69 @@ def test_run_after_stop():
     runafterstop.end_condition = runafterstop.observation_variable
     runafterstop.start_condition = node1.observation_variable
 
+    node2 = CountTicks(name="delay endmotion", ticks=5)
+    msc.add_node(node2)
+    node2.start_condition = runafterstop.observation_variable
+
+    end = EndMotion()
+    msc.add_node(end)
+    end.start_condition = node2.observation_variable
+
     kin_sim = Executor(world=World())
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
     msc.draw("muh.pdf")
+
+
+def test_end_before_start():
+    msc = MotionStatechart()
+
+    node1 = CountTicks(ticks=1)
+    msc.add_node(node1)
+
+    node2 = ConstTrueNode()
+    msc.add_node(node2)
+
+    end = EndMotion()
+    msc.add_node(end)
+    end.start_condition = node1.observation_variable
+    end.end_condition = node2.observation_variable
+
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick()
+    kin_sim.tick()
+
+    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert end.observation_state == ObservationStateValues.UNKNOWN
+
+    kin_sim.tick()
+    msc.draw("muh.pdf")
+
+    assert end.life_cycle_state == LifeCycleValues.DONE
+    assert end.observation_state == ObservationStateValues.TRUE
+
+
+def test_end_before_start_in_template():
+    msc = MotionStatechart()
+
+    node = TestEndBeforeStart()
+    msc.add_node(node)
+
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick()
+    kin_sim.tick()
+    msc.draw("muh.pdf")
+
+    assert node.end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node.end.observation_state == ObservationStateValues.UNKNOWN
+
+    kin_sim.tick()
+    msc.draw("muh.pdf")
+
+    assert node.end.life_cycle_state == LifeCycleValues.DONE
+    assert node.end.observation_state == ObservationStateValues.TRUE
 
 
 @dataclass(eq=False, repr=False)

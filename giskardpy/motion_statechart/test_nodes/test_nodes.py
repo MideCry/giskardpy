@@ -14,6 +14,7 @@ from giskardpy.motion_statechart.graph_node import (
     Goal,
     NodeArtifacts,
     CancelMotion,
+    EndMotion,
 )
 from giskardpy.motion_statechart.monitors.payload_monitors import CountTicks, Print
 
@@ -111,3 +112,25 @@ class TestRunAfterStop(Goal):
         return NodeArtifacts(
             observation=cas.Expression(self.ticking2.observation_variable)
         )
+
+
+@dataclass(repr=False, eq=False)
+class TestEndBeforeStart(Goal):
+    node1: CountTicks = field(init=False)
+    node2: ConstTrueNode = field(init=False)
+    end: EndMotion = field(init=False)
+
+    def expand(self, context: BuildContext) -> None:
+        self.node1 = CountTicks(ticks=1)
+        self.add_node(self.node1)
+
+        self.node2 = ConstTrueNode()
+        self.add_node(self.node2)
+
+        self.end = EndMotion()
+        self.add_node(self.end)
+        self.end.start_condition = self.node1.observation_variable
+        self.end.end_condition = self.node2.observation_variable
+
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        return NodeArtifacts(observation=cas.Expression(self.end.observation_variable))
