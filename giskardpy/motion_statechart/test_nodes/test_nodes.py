@@ -4,7 +4,7 @@ from typing import Optional
 import semantic_digital_twin.spatial_types.spatial_types as cas
 
 from giskardpy.data_types.exceptions import (
-    ExecutionException,
+    GiskardException,
 )
 from giskardpy.motion_statechart.context import ExecutionContext, BuildContext
 from giskardpy.motion_statechart.graph_node import (
@@ -94,7 +94,7 @@ class TestRunAfterStop(Goal):
         self.ticking2 = CountTicks(name="2ticks", ticks=2)
         self.cancel = CancelMotion(
             name="Cancel_on_tick_after_done",
-            exception=ExecutionException("Node ticked after template stopped"),
+            exception=GiskardException("Node ticked after template stopped"),
         )
 
         self.add_nodes(
