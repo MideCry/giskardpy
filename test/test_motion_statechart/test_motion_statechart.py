@@ -55,6 +55,7 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestGoal,
     TestNestedGoal,
     ConstFalseNode,
+    TestRunAfterStop,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import angle_between_vector
@@ -719,6 +720,23 @@ def test_nested_goals():
     assert outer.life_cycle_state == LifeCycleValues.RUNNING
     assert end.life_cycle_state == LifeCycleValues.RUNNING
     assert msc_copy.is_end_motion()
+
+
+def test_run_after_stop():
+    msc = MotionStatechart()
+
+    node1 = ConstTrueNode()
+    msc.add_node(node1)
+
+    runafterstop = TestRunAfterStop()
+    msc.add_node(runafterstop)
+    runafterstop.end_condition = runafterstop.observation_variable
+    runafterstop.start_condition = node1.observation_variable
+
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+    msc.draw("muh.pdf")
 
 
 @dataclass(eq=False, repr=False)

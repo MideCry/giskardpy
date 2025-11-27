@@ -2,12 +2,20 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+
+from giskardpy.data_types.exceptions import (
+    GiskardException,
+    ExecutionCanceledException,
+    ExecutionException,
+)
 from giskardpy.motion_statechart.context import ExecutionContext, BuildContext
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     Goal,
     NodeArtifacts,
+    CancelMotion,
 )
+from giskardpy.motion_statechart.monitors.payload_monitors import CountTicks, Print
 
 
 @dataclass(eq=False, repr=False)
@@ -72,4 +80,34 @@ class TestNestedGoal(Goal):
     def build(self, context: BuildContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=cas.Expression(self.inner.observation_variable)
+        )
+
+
+@dataclass(repr=False, eq=False)
+class TestRunAfterStop(Goal):
+    ticking1: CountTicks = field(init=False)
+    ticking2: CountTicks = field(init=False)
+    cancel: CancelMotion = field(init=False)
+    false: ConstFalseNode = field(init=False)
+
+    def expand(self, context: BuildContext) -> None:
+        self.ticking1 = CountTicks(name="3ticks", ticks=3)
+        self.ticking2 = CountTicks(name="2ticks", ticks=2)
+        self.cancel = CancelMotion(
+            name="Cancel_on_tick_after_done",
+            exception=ExecutionException("Node ticked after template stopped"),
+        )
+
+        self.add_nodes(
+            nodes=[
+                self.ticking1,
+                self.ticking2,
+                self.cancel,
+            ]
+        )
+        self.cancel.start_condition = self.ticking1.observation_variable
+
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        return NodeArtifacts(
+            observation=cas.Expression(self.ticking2.observation_variable)
         )
