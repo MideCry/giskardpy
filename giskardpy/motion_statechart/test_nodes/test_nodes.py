@@ -4,8 +4,6 @@ from typing import Optional
 import semantic_digital_twin.spatial_types.spatial_types as cas
 
 from giskardpy.data_types.exceptions import (
-    GiskardException,
-    ExecutionCanceledException,
     ExecutionException,
 )
 from giskardpy.motion_statechart.context import ExecutionContext, BuildContext
