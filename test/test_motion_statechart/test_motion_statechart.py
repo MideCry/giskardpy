@@ -1,9 +1,11 @@
 import json
-import time
 from dataclasses import dataclass
+from math import radians
 
 import numpy as np
 import pytest
+import time
+
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
@@ -48,7 +50,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianOrientation,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.tasks.pointing import Pointing
+from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ChangeStateOnEvents,
     ConstTrueNode,
@@ -58,6 +60,7 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestRunAfterStop,
     TestEndBeforeStart,
 )
+from giskardpy.qp.exceptions import HardConstraintsViolatedException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import angle_between_vector
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -82,8 +85,11 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
+    FixedConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import Cylinder
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -1269,6 +1275,57 @@ def test_pointing(pr2_world: World):
     kin_sim.tick_until_end()
 
 
+def test_pointing_cone(pr2_world: World):
+    tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
+
+    msc = MotionStatechart()
+
+    goal_point = cas.Point3(-1, 0, 5, reference_frame=root)
+    pointing_axis = cas.Vector3.X(tip)
+    cone_theta = radians(20)
+    pointing_cone = PointingCone(
+        root_link=root,
+        tip_link=tip,
+        goal_point=goal_point,
+        pointing_axis=pointing_axis,
+        cone_theta=cone_theta,
+    )
+    msc.add_node(pointing_cone)
+    end = EndMotion()
+    msc.add_node(end)
+    end.start_condition = pointing_cone.observation_variable
+
+    kin_sim = Executor(
+        world=pr2_world,
+        controller_config=QPControllerConfig.create_default_with_50hz(),
+    )
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+
+    # Check if angle between pointing axis and tip->goal vector is within the cone
+    root_V_pointing_axis = pr2_world.transform(target_frame=root, spatial_object=pointing_axis)
+    root_V_pointing_axis.scale(1)
+    v_pointing = root_V_pointing_axis.to_np()[:3]
+
+    root_P_goal = pr2_world.transform(target_frame=root, spatial_object=goal_point)
+    tip_origin_in_root = pr2_world.transform(
+        target_frame=root, spatial_object=cas.Point3(0, 0, 0, reference_frame=tip)
+    )
+    root_V_goal_axis = root_P_goal - tip_origin_in_root
+    root_V_goal_axis.scale(1)
+    v_goal = root_V_goal_axis.to_np()[:3]
+
+    eps = 1e-9
+    assert np.linalg.norm(v_pointing) > eps, "pointing axis became zero-length"
+    assert np.linalg.norm(v_goal) > eps, "tip->goal vector became zero-length"
+
+    angle = angle_between_vector(v_pointing, v_goal)
+
+    assert angle <= cone_theta + pointing_cone.threshold, (
+        f"PointingCone failed: final angle {angle:.6f} rad > cone_theta {cone_theta:.6f} rad"
+    )
+
 def test_align_planes(pr2_world: World):
     tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
@@ -1377,60 +1434,6 @@ def test_transition_triggers():
     msc.draw("muh.pdf")
     assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert changer.state == "on_reset"
-
-
-def test_collision_avoidance(box_bot_world):
-    msc = MotionStatechart()
-
-    root = box_bot_world.root
-    tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
-
-    target_pose = TransformationMatrix.from_xyz_quaternion(
-        1, reference_frame=box_bot_world.root
-    )
-    cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=target_pose,
-    )
-    msc.add_node(cart_goal)
-
-    collision_avoidance = CollisionAvoidance(
-        collision_entries=[CollisionRequest.avoid_all_collision()],
-    )
-    msc.add_node(collision_avoidance)
-
-    local_min = LocalMinimumReached()
-    msc.add_node(local_min)
-
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = local_min.observation_variable
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
-    kwargs = tracker.create_kwargs()
-    msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
-
-    kin_sim = Executor(
-        world=box_bot_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
-        collision_checker=CollisionCheckerLib.bpb,
-    )
-    kin_sim.compile(motion_statechart=msc)
-
-    msc_copy.draw("muh.pdf")
-    kin_sim.tick_until_end(500)
-    kin_sim.collision_scene.check_collisions()
-    contact_distance = (
-        kin_sim.collision_scene.closest_points.external_collisions[tip]
-        .data[0]
-        .contact_distance
-    )
-    assert contact_distance > 0.049
 
 
 def test_not_not_in_motion_statechart():
@@ -1730,3 +1733,152 @@ class TestOpenClose:
 
         assert opened.observation_state == ObservationStateValues.TRUE
         assert closed.observation_state == ObservationStateValues.TRUE
+
+
+class TestCollisionAvoidance:
+    def test_collision_avoidance(self, box_bot_world: World):
+        tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                CartesianPose(
+                    root_link=box_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=TransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=box_bot_world.root
+                    ),
+                ),
+                CollisionAvoidance(
+                    collision_entries=[CollisionRequest.avoid_all_collision()],
+                ),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            world=box_bot_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+            collision_checker=CollisionCheckerLib.bpb,
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        msc_copy.draw("muh.pdf")
+        kin_sim.tick_until_end(500)
+        kin_sim.collision_scene.check_collisions()
+        contact_distance = (
+            kin_sim.collision_scene.closest_points.external_collisions[tip]
+            .data[0]
+            .contact_distance
+        )
+        assert contact_distance > 0.049
+
+    def test_hard_constraints_violated(self, box_bot_world: World):
+        root = box_bot_world.root
+        with box_bot_world.modify_world():
+            env2 = Body(
+                name=PrefixedName("environment2"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env2,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(0.75),
+            )
+            box_bot_world.add_connection(env_connection)
+
+            env3 = Body(
+                name=PrefixedName("environment3"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env3,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(1.25),
+            )
+            box_bot_world.add_connection(env_connection)
+            env4 = Body(
+                name=PrefixedName("environment4"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env4,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    x=1, y=-0.25
+                ),
+            )
+            box_bot_world.add_connection(env_connection)
+            env5 = Body(
+                name=PrefixedName("environment5"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env5,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    x=1, y=0.25
+                ),
+            )
+            box_bot_world.add_connection(env_connection)
+
+        tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
+
+        msc = MotionStatechart()
+        msc.add_node(
+            Sequence(
+                [
+                    SetOdometry(
+                        base_pose=TransformationMatrix.from_xyz_rpy(
+                            x=1, reference_frame=box_bot_world.root
+                        )
+                    ),
+                    Parallel(
+                        [
+                            CartesianPose(
+                                root_link=box_bot_world.root,
+                                tip_link=tip,
+                                goal_pose=TransformationMatrix.from_xyz_rpy(
+                                    x=1, reference_frame=box_bot_world.root
+                                ),
+                            ),
+                            CollisionAvoidance(
+                                collision_entries=[
+                                    CollisionRequest.avoid_all_collision()
+                                ],
+                            ),
+                        ]
+                    ),
+                ]
+            )
+        )
+        msc.add_node(local_min := LocalMinimumReached())
+        msc.add_node(EndMotion.when_true(local_min))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            world=box_bot_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+            collision_checker=CollisionCheckerLib.bpb,
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        msc_copy.draw("muh.pdf")
+        with pytest.raises(HardConstraintsViolatedException):
+            kin_sim.tick_until_end()
